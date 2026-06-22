@@ -53,20 +53,18 @@ export default function NodeDetailsPage() {
   const [installing, setInstalling] = useState(false);
 
   const fetchNode = async () => {
-    const token = localStorage.getItem('auth_token');
-    if (!token) {
+    const admin = localStorage.getItem('admin');
+    if (!admin) {
       router.push('/login');
       return;
     }
 
     try {
-      const res = await fetch(`/api/nodes/${nodeId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/nodes/${nodeId}`);
 
       if (!res.ok) {
         if (res.status === 401) {
-          localStorage.removeItem('auth_token');
+          localStorage.removeItem('admin');
           router.push('/login');
           return;
         }
@@ -96,12 +94,10 @@ export default function NodeDetailsPage() {
     if (!confirm('Install OpenVPN on this node?')) return;
     setInstalling(true);
 
-    const token = localStorage.getItem('auth_token');
     const res = await fetch(`/api/nodes/${nodeId}/install`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         serverHost: node?.host,
@@ -124,10 +120,8 @@ export default function NodeDetailsPage() {
   const handleDelete = async () => {
     if (!confirm(`Delete node "${node?.name}"?`)) return;
 
-    const token = localStorage.getItem('auth_token');
     const res = await fetch(`/api/nodes/${nodeId}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
     });
 
     if (res.ok) {

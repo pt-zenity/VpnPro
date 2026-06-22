@@ -201,11 +201,27 @@ export class OpenVpnOps {
    */
   async revokeClient(name: string): Promise<{ success: true }> {
     try {
+      // Run revoke script
       await exec(
         path.join(ADMIN_DIR, 'revoke-user.sh'),
         [name],
         { timeout: 60000 }
       );
+
+      // CRITICAL: Reload OpenVPN to apply CRL immediately
+      // Otherwise revoked certificates may continue working
+      try {
+        await exec('systemctl', ['reload', 'openvpn-xor'], { timeout: 10000 });
+        console.log(`  ✓ OpenVPN reloaded - CRL applied for ${name}`);
+      } catch (reloadError) {
+        // Fallback to SIGHUP if systemctl reload fails
+        try {
+          await exec('killall', ['-HUP', 'openvpn'], { timeout: 5000 });
+          console.log(`  ✓ OpenVPN SIGHUP sent - CRL applied for ${name}`);
+        } catch (hupError) {
+          console.warn(`  ⚠ Warning: Could not reload OpenVPN CRL`);
+        }
+      }
 
       return { success: true };
     } catch (error: any) {

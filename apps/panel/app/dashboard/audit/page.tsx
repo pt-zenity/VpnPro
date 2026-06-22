@@ -20,20 +20,18 @@ export default function AuditPage() {
 
   useEffect(() => {
     const fetchLogs = async () => {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
+      const admin = localStorage.getItem('admin');
+      if (!admin) {
         router.push('/login');
         return;
       }
 
       try {
-        const res = await fetch('/api/audit-logs', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch('/api/audit-logs');
 
         if (!res.ok) {
           if (res.status === 401) {
-            localStorage.removeItem('auth_token');
+            localStorage.removeItem('admin');
             router.push('/login');
             return;
           }

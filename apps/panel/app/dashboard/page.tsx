@@ -19,20 +19,18 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const fetchStats = async () => {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
+      const admin = localStorage.getItem('admin');
+      if (!admin) {
         window.location.href = '/login';
         return;
       }
 
       try {
-        const res = await fetch('/api/dashboard/stats', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch('/api/dashboard/stats');
 
         if (!res.ok) {
           if (res.status === 401) {
-            localStorage.removeItem('auth_token');
+            localStorage.removeItem('admin');
             window.location.href = '/login';
             return;
           }

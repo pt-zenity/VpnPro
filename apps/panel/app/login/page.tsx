@@ -16,8 +16,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
+    const admin = localStorage.getItem('admin');
+    if (admin) {
       router.push('/dashboard');
     }
   }, [router]);
@@ -42,7 +42,6 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.setItem('auth_token', data.token);
       localStorage.setItem('admin', JSON.stringify(data.admin));
 
       router.push('/dashboard');

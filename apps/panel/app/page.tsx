@@ -7,8 +7,8 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
+    const admin = localStorage.getItem('admin');
+    if (admin) {
       router.push('/dashboard');
     } else {
       router.push('/login');

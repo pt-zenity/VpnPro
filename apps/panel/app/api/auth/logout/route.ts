@@ -1,24 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/crypto';
+import { authenticateRequest } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
 
 // POST /api/auth/logout
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'INVALID_TOKEN', message: 'No token provided' },
-        { status: 401 },
-      );
-    }
-
-    const token = authHeader.slice(7);
-    const payload = await verifyToken(token);
+    const payload = await authenticateRequest(request);
 
     if (!payload) {
       return NextResponse.json(
-        { error: 'INVALID_TOKEN', message: 'Invalid token' },
+        { error: 'INVALID_TOKEN', message: 'No valid token provided' },
         { status: 401 },
       );
     }
@@ -33,6 +25,9 @@ export async function POST(request: NextRequest) {
         userAgent: request.headers.get('user-agent') ?? undefined,
       },
     });
+
+    const cookieStore = await cookies();
+    cookieStore.delete('auth_token');
 
     // Client-side should discard token
     // No server-side token blacklist (stateless)

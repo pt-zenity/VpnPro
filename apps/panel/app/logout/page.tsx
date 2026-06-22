@@ -7,9 +7,10 @@ export default function LogoutPage() {
   const router = useRouter();
 
   useEffect(() => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('admin');
-    router.push('/login');
+    fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
+      localStorage.removeItem('admin');
+      router.push('/login');
+    });
   }, [router]);
 
   return (

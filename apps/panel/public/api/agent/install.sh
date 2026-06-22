@@ -260,7 +260,11 @@ echo -e "  ${GREEN}✓ Configured${NC}"
 
 echo -e "${CYAN}[Step 6/10]${NC} Compiling OpenVPN (this takes a few minutes)..."
 
-make -j$(nproc) > /dev/null 2>&1
+make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1) > /tmp/openvpn-build.log 2>&1 || {
+    echo -e "${RED}✗ Compilation failed${NC}"
+    tail -20 /tmp/openvpn-build.log
+    exit 1
+}
 
 echo -e "  ${GREEN}✓ Compiled successfully${NC}"
 
@@ -280,7 +284,14 @@ echo -e "${CYAN}[Step 8/10]${NC} Setting up PKI infrastructure..."
 
 OVPN_DIR="/etc/openvpn/xor"
 ADMIN_DIR="/root/ovpn-xor-admin"
-SERVER_IP="$(curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 icanhazip.com 2>/dev/null || echo 'SERVER_IP')"
+SERVER_IP="$(curl -s -4 --max-time 5 ifconfig.me 2>/dev/null || curl -s -4 --max-time 5 icanhazip.com 2>/dev/null || hostname -I | awk '{print $1}')"
+
+# Validate SERVER_IP
+if [[ -z "$SERVER_IP" ]] || [[ "$SERVER_IP" == "SERVER_IP" ]] || ! [[ "$SERVER_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo -e "${RED}✗ Cannot detect server IP address${NC}"
+    echo "Please ensure internet connectivity or set SERVER_IP manually"
+    exit 1
+fi
 
 rm -rf "$OVPN_DIR" "$ADMIN_DIR"
 mkdir -p "$OVPN_DIR"/{easy-rsa,ccd}

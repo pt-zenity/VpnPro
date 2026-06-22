@@ -26,12 +26,10 @@ export default function NewNodePage() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('auth_token');
       const response = await fetch('/api/nodes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ name, host, port: parseInt(port) }),
       });

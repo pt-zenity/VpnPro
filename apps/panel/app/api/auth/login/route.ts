@@ -41,6 +41,15 @@ export async function POST(request: NextRequest) {
       role: admin.role,
     });
 
+    const { cookies } = await import('next/headers');
+    const cookieStore = await cookies();
+    cookieStore.set('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    });
+
     // Audit log
     await prisma.auditLog.create({
       data: {

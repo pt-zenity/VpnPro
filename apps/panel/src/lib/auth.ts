@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { verifyToken } from './crypto';
+import { cookies } from 'next/headers';
 
 export interface AuthPayload {
   sub: string;
@@ -7,13 +8,23 @@ export interface AuthPayload {
   role: 'SUPERADMIN' | 'ADMIN';
 }
 
-export async function authenticateRequest(request: NextRequest): Promise<AuthPayload | null> {
+async function extractToken(request: NextRequest): Promise<string | null> {
+  const cookieStore = await cookies();
+  const cookieToken = cookieStore.get('auth_token')?.value;
+  if (cookieToken) return cookieToken;
+
   const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return null;
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice(7);
   }
 
-  const token = authHeader.slice(7);
+  return null;
+}
+
+export async function authenticateRequest(request: NextRequest): Promise<AuthPayload | null> {
+  const token = await extractToken(request);
+  if (!token) return null;
+
   const payload = await verifyToken(token);
   if (!payload) return null;
 
@@ -26,12 +37,11 @@ export async function authenticateRequest(request: NextRequest): Promise<AuthPay
 }
 
 export async function requireAuth(request: NextRequest): Promise<AuthPayload> {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
+  const token = await extractToken(request);
+  if (!token) {
     throw new Error('UNAUTHORIZED');
   }
 
-  const token = authHeader.slice(7);
   const payload = await verifyToken(token);
 
   if (!payload) {

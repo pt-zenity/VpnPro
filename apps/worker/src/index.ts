@@ -16,11 +16,9 @@ const worker = new Worker('ovpn-jobs', async (job: Job) => {
       throw new Error(`Unknown job type: ${job.name}`);
   }
 }, {
-  connection: {
-    host: 'localhost',
-    port: 6379,
+  connection: new (require('ioredis'))(process.env.REDIS_URL || 'redis://localhost:6379', {
     maxRetriesPerRequest: null,
-  },
+  }),
   concurrency: 5,
 });
 

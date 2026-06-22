@@ -30,20 +30,18 @@ export default function NodeClientsPage() {
   const [nodeName, setNodeName] = useState('');
 
   const fetchClients = async () => {
-    const token = localStorage.getItem('auth_token');
-    if (!token) {
+    const admin = localStorage.getItem('admin');
+    if (!admin) {
       router.push('/login');
       return;
     }
 
     try {
-      const res = await fetch(`/api/nodes/${nodeId}/clients`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/nodes/${nodeId}/clients`);
 
       if (!res.ok) {
         if (res.status === 401) {
-          localStorage.removeItem('auth_token');
+          localStorage.removeItem('admin');
           router.push('/login');
           return;
         }
@@ -65,10 +63,8 @@ export default function NodeClientsPage() {
   const handleRevoke = async (clientId: string, clientName: string) => {
     if (!confirm(`Revoke client "${clientName}"? This action cannot be undone.`)) return;
 
-    const token = localStorage.getItem('auth_token');
     const res = await fetch(`/api/clients/${clientId}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
     });
 
     if (res.ok) {
@@ -80,10 +76,7 @@ export default function NodeClientsPage() {
   };
 
   const handleDownload = async (clientId: string, clientName: string) => {
-    const token = localStorage.getItem('auth_token');
-    const res = await fetch(`/api/clients/${clientId}/download`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(`/api/clients/${clientId}/download`);
 
     if (!res.ok) {
       const data = await res.json();

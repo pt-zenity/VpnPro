@@ -22,12 +22,10 @@ export default function NewClientPage() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('auth_token');
       const response = await fetch(`/api/nodes/${nodeId}/clients`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           name,
@@ -58,10 +56,7 @@ export default function NewClientPage() {
     if (!polling || !jobId) return;
 
     const interval = setInterval(async () => {
-      const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/jobs/${jobId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(`/api/jobs/${jobId}`);
       const data = await response.json();
 
       setJobStatus(data.job.status);

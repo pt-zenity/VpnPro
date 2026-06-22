@@ -54,13 +54,9 @@ export function withOptionalAuth<T = NextRequest>(
   handler: (request: NextRequest, payload: AuthPayload | null, context?: any) => Promise<NextResponse>
 ) {
   return async (request: NextRequest, context?: any) => {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return await handler(request, null, context);
-    }
-
     try {
-      const payload = await requireAuth(request);
+      const { authenticateRequest } = await import('./auth');
+      const payload = await authenticateRequest(request);
       return await handler(request, payload, context);
     } catch {
       return await handler(request, null, context);
