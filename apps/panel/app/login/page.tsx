@@ -140,15 +140,6 @@ export default function LoginPage() {
               </span>
             </Button>
           </form>
-
-          <div className="text-center pt-4 border-t border-border/50">
-            <p className="text-sm text-muted-foreground">Demo credentials:</p>
-            <div className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg border border-border/50">
-              <code className="text-sm font-mono text-foreground">admin@example.com</code>
-              <span className="text-muted-foreground">/</span>
-              <code className="text-sm font-mono text-foreground">admin123</code>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </main>

@@ -37,7 +37,7 @@ else
 fi
 
 # Install dependencies
-echo -e "${YELLOW}[1/7] Installing dependencies...${NC}"
+echo -e "${YELLOW}[1/8] Installing dependencies...${NC}"
 
 if [[ "$OS" == "ubuntu" || "$OS" == "debian" ]]; then
     export DEBIAN_FRONTEND=noninteractive
@@ -88,7 +88,7 @@ fi
 echo -e "${GREEN}Dependencies installed!${NC}"
 
 # Clone repository
-echo -e "${YELLOW}[2/7] Cloning repository...${NC}"
+echo -e "${YELLOW}[2/8] Cloning repository...${NC}"
 
 REPO_DIR="/root/ovpn"
 if [ -d "$REPO_DIR" ]; then
@@ -102,7 +102,7 @@ cd "$REPO_DIR"
 echo -e "${GREEN}Repository cloned!${NC}"
 
 # Generate secrets
-echo -e "${YELLOW}[3/7] Generating secure secrets...${NC}"
+echo -e "${YELLOW}[3/8] Generating secure secrets...${NC}"
 
 DB_PASS=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32)
 JWT_SECRET=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32)
@@ -137,6 +137,40 @@ AGENT_HEARTBEAT_TIMEOUT="5"
 EOF
 
 echo -e "${GREEN}Secrets generated!${NC}"
+
+# Prompt for admin credentials
+echo -e "${YELLOW}[4/7] Configuring admin account...${NC}"
+echo ""
+
+# Validate and get admin email
+while true; do
+  read -p "Enter admin email: " ADMIN_EMAIL
+  if [[ "$ADMIN_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+    break
+  else
+    echo -e "${RED}Invalid email format. Please try again.${NC}"
+  fi
+done
+
+# Validate and get admin password
+while true; do
+  read -s -p "Enter admin password (min 8 characters): " ADMIN_PASSWORD
+  echo ""
+  if [[ ${#ADMIN_PASSWORD} -ge 8 ]]; then
+    read -s -p "Confirm admin password: " ADMIN_PASSWORD_CONFIRM
+    echo ""
+    if [[ "$ADMIN_PASSWORD" == "$ADMIN_PASSWORD_CONFIRM" ]]; then
+      break
+    else
+      echo -e "${RED}Passwords do not match. Please try again.${NC}"
+    fi
+  else
+    echo -e "${RED}Password must be at least 8 characters. Please try again.${NC}"
+  fi
+done
+
+echo ""
+echo -e "${GREEN}Admin account configured!${NC}"
 
 # Start PostgreSQL and Redis
 echo -e "${YELLOW}[4/7] Starting PostgreSQL and Redis...${NC}"
@@ -176,7 +210,7 @@ done
 echo -e "${GREEN}Databases started!${NC}"
 
 # Install dependencies
-echo -e "${YELLOW}[5/7] Installing npm dependencies...${NC}"
+echo -e "${YELLOW}[6/8] Installing npm dependencies...${NC}"
 
 cd "$REPO_DIR"
 pnpm install --silent
@@ -184,7 +218,7 @@ pnpm install --silent
 echo -e "${GREEN}Dependencies installed!${NC}"
 
 # Build packages and apps
-echo -e "${YELLOW}[6/7] Building application...${NC}"
+echo -e "${YELLOW}[7/8] Building application...${NC}"
 
 # Generate Prisma client
 npx prisma generate
@@ -201,14 +235,12 @@ pnpm run build:worker
 echo -e "${GREEN}Application built!${NC}"
 
 # Setup database
-echo -e "${YELLOW}[7/7] Setting up database...${NC}"
+echo -e "${YELLOW}[8/8] Setting up database...${NC}"
 
 cd "$REPO_DIR"
 npx prisma db push --skip-generate
 
-# Create admin user
-ADMIN_PASSWORD=$(openssl rand -base64 16 | tr -d '/+=' | head -c 16)
-
+# Create admin user with provided credentials
 cat > prisma/seed.ts << SEED_EOF
 import { PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
@@ -223,17 +255,16 @@ async function main() {
   const hash = crypto.createHash('sha256').update(password + salt).digest('hex');
 
   const admin = await prisma.admin.upsert({
-    where: { email: 'admin@example.com' },
+    where: { email: '${ADMIN_EMAIL}' },
     update: {},
     create: {
-      email: 'admin@example.com',
+      email: '${ADMIN_EMAIL}',
       passwordHash: hash,
       role: 'SUPERADMIN',
     },
   });
 
-  console.log('Created admin: admin@example.com');
-  console.log('Password: ${ADMIN_PASSWORD}');
+  console.log('Created admin: ${ADMIN_EMAIL}');
   console.log('IMPORTANT: Change password after first login!');
 }
 
@@ -243,7 +274,7 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await prisma.\$disconnect();
   });
 SEED_EOF
 
@@ -313,8 +344,8 @@ echo ""
 echo "Panel URL: ${GREEN}http://${SERVER_IP}:3000${NC}"
 echo ""
 echo "Admin Login:"
-echo "  Email: ${YELLOW}admin@example.com${NC}"
-echo "  Password: ${YELLOW}${ADMIN_PASSWORD}${NC}"
+echo "  Email: ${YELLOW}${ADMIN_EMAIL}${NC}"
+echo "  Password: ${YELLOW}(the password you entered)${NC}"
 echo ""
 echo -e "${RED}⚠️  CHANGE PASSWORD AFTER FIRST LOGIN!${NC}"
 echo ""
