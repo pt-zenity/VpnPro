@@ -93,7 +93,7 @@ if [[ "$OS" == "ubuntu" ]] || [[ "$OS" == "debian" ]]; then
     apt-get update -qq
 
     # Install critical build dependencies first (must succeed)
-    apt-get install -y build-essential libssl-dev libpam0g-dev liblz4-dev pkg-config libcap-ng-dev libnl-genl-3-dev
+    apt-get install -y build-essential libssl-dev libpam0g-dev liblz4-dev pkg-config libcap-ng-dev libnl-genl-3-dev liblzo2-dev
 
     # Install other dependencies (npm may fail, not critical)
     apt-get install -y git wget curl ca-certificates uuid-runtime nodejs npm 2>/dev/null || true
