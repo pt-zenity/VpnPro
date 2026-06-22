@@ -501,27 +501,27 @@ echo -e "${CYAN}[Step 9/10]${NC} Creating admin scripts..."
 cat > "$ADMIN_DIR/add-user.sh" << 'EOFCREATE'
 #!/bin/bash
 set -e
-USER="\$1"
-[ -z "\$USER" ] && { echo "Usage: \$0 <username>"; exit 1; }
+USER="$1"
+[ -z "$USER" ] && { echo "Usage: $0 <username>"; exit 1; }
 OVPN_DIR="/etc/openvpn/xor"
 ADMIN_DIR="/root/ovpn-xor-admin"
-cd "\$OVPN_DIR/easy-rsa"
-yes yes | ./easyrsa build-client-full "\$USER" nopass > /dev/null 2>&1
-SERVER_IP="\$(curl -s -4 ifconfig.me || echo 'SERVER_IP')"
-XOR_MASK="\$(cat \$OVPN_DIR/xormask.txt 2>/dev/null || echo '')"
+cd "$OVPN_DIR/easy-rsa"
+yes yes | ./easyrsa build-client-full "$USER" nopass > /dev/null 2>&1
+SERVER_IP="$(curl -s -4 ifconfig.me || echo 'SERVER_IP')"
+XOR_MASK="$(cat $OVPN_DIR/xormask.txt 2>/dev/null || echo '')"
 
 # Check if XOR is supported
-if [ -n "\$XOR_MASK" ] && [ "\$XOR_MASK" != "disabled" ] && [ "\$XOR_MASK" != "default" ]; then
-    XOR_LINE="scramble xormask \${XOR_MASK}"
+if [ -n "$XOR_MASK" ] && [ "$XOR_MASK" != "disabled" ] && [ "$XOR_MASK" != "default" ]; then
+    XOR_LINE="scramble xormask ${XOR_MASK}"
 else
     XOR_LINE=""
 fi
 
-cat > "\$ADMIN_DIR/clients/\$USER.ovpn" << EOF
+cat > "$ADMIN_DIR/clients/$USER.ovpn" << EOF
 client
 dev tun
 proto udp
-remote \${SERVER_IP} 443
+remote ${SERVER_IP} 443
 resolv-retry infinite
 nobind
 persist-key
@@ -529,22 +529,22 @@ persist-tun
 remote-cert-tls server
 data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
 auth SHA256
-\${XOR_LINE}
+${XOR_LINE}
 verb 3
 <ca>
-\$(cat \$OVPN_DIR/ca.crt)
+$(cat $OVPN_DIR/ca.crt)
 </ca>
 <cert>
-\$(openssl x509 -in \$OVPN_DIR/easy-rsa/pki/issued/\$USER.crt)
+$(openssl x509 -in $OVPN_DIR/easy-rsa/pki/issued/$USER.crt)
 </cert>
 <key>
-\$(cat \$OVPN_DIR/easy-rsa/pki/private/\$USER.key)
+$(cat $OVPN_DIR/easy-rsa/pki/private/$USER.key)
 </key>
 <tls-crypt>
-\$(cat \$OVPN_DIR/ta.key)
+$(cat $OVPN_DIR/ta.key)
 </tls-crypt>
 EOF
-echo "Client \$USER created: \$ADMIN_DIR/clients/\$USER.ovpn"
+echo "Client $USER created: $ADMIN_DIR/clients/$USER.ovpn"
 EOFCREATE
 
 chmod +x "$ADMIN_DIR/add-user.sh"
@@ -553,15 +553,15 @@ chmod +x "$ADMIN_DIR/add-user.sh"
 cat > "$ADMIN_DIR/revoke-user.sh" << 'EOFCREATE'
 #!/bin/bash
 set -e
-USER="\$1"
-[ -z "\$USER" ] && { echo "Usage: \$0 <username>"; exit 1; }
+USER="$1"
+[ -z "$USER" ] && { echo "Usage: $0 <username>"; exit 1; }
 OVPN_DIR="/etc/openvpn/xor"
-cd "\$OVPN_DIR/easy-rsa"
-./easyrsa revoke "\$USER" > /dev/null 2>&1
+cd "$OVPN_DIR/easy-rsa"
+./easyrsa revoke "$USER" > /dev/null 2>&1
 ./easyrsa gen-crl > /dev/null 2>&1
-cp pki/crl.pem "\$OVPN_DIR/crl.pem"
-pkill -f "\$USER"
-echo "Client \$USER revoked"
+cp pki/crl.pem "$OVPN_DIR/crl.pem"
+pkill -f "$USER" || true
+echo "Client $USER revoked"
 EOFCREATE
 
 chmod +x "$ADMIN_DIR/revoke-user.sh"
@@ -570,11 +570,11 @@ chmod +x "$ADMIN_DIR/revoke-user.sh"
 cat > "$ADMIN_DIR/list-users.sh" << 'EOFCREATE'
 #!/bin/bash
 OVPN_DIR="/etc/openvpn/xor"
-cd "\$OVPN_DIR/easy-rsa"
+cd "$OVPN_DIR/easy-rsa"
 ls pki/issued/*.crt 2>/dev/null | grep -v server.crt | while read cert; do
-  name="\$(basename \$cert .crt)"
-  status="\$(grep "\${name}\$" pki/index.txt | awk '{print \$1}')"
-  [ "\$status" = "V" ] && echo "  ✓ \$name"
+  name="$(basename $cert .crt)"
+  status="$(grep "${name}$" pki/index.txt | awk '{print $1}')"
+  [ "$status" = "V" ] && echo "  ✓ $name"
 done
 EOFCREATE
 
