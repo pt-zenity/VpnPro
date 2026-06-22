@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({
-      clients: clients.map(c => ({
+      clients: clients.map((c: any) => ({
         name: c.name,
         status: c.status === 'ACTIVE' ? 'ACTIVE' : 'REVOKED',
         fingerprint: c.fingerprint,
