@@ -1,7 +1,14 @@
 import { PrismaClient } from '@prisma/client';
-import { hashPassword } from '../apps/panel/src/lib/crypto';
+import { createHash } from 'crypto';
 
 const prisma = new PrismaClient();
+
+// Node.js compatible password hashing (same algorithm as crypto.ts)
+async function hashPassword(password: string): Promise<string> {
+  const salt = process.env.PASSWORD_SALT || 'default_salt';
+  const hash = createHash('sha256').update(password + salt).digest('hex');
+  return hash;
+}
 
 async function main() {
   console.log('Seeding database...');
