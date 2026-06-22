@@ -24,7 +24,7 @@ export async function callAgentApi(
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      const axiosError = error as AxiosError;
+      const axiosError = error as AxiosError<any>;
       if (axiosError.response) {
         return {
           success: false,
