@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Docker
+*.tar.gz
+
+# Claude
+.claude/

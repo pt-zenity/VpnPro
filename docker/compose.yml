@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ovpn-admin-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ovpn
+      POSTGRES_PASSWORD: ovpn_dev_password_change_me
+      POSTGRES_DB: ovpn_admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ovpn"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ovpn-admin-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  panel:
+    build:
+      context: ..
+      dockerfile: docker/panel.Dockerfile
+    container_name: ovpn-admin-panel
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://ovpn:ovpn_dev_password_change_me@postgres:5432/ovpn_admin
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: change_me_in_production_use_openssl_rand_base64_32
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/worker.Dockerfile
+    container_name: ovpn-admin-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://ovpn:ovpn_dev_password_change_me@postgres:5432/ovpn_admin
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:

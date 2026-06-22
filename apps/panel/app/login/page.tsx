@@ -1,0 +1,157 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
+import { Shield, Lock, Mail, AlertCircle } from 'lucide-react';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      router.push('/dashboard');
+    }
+  }, [router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || 'Login failed');
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem('auth_token', data.token);
+      localStorage.setItem('admin', JSON.stringify(data.admin));
+
+      router.push('/dashboard');
+    } catch (err) {
+      setError('Network error. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background relative overflow-hidden">
+      {/* Background effects */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(96,165,250,0.15),transparent)]" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-3xl" />
+      </div>
+
+      <Card className="w-full max-w-md glass premium-glow mx-4">
+        <CardHeader className="text-center space-y-2 pb-6">
+          <div className="flex justify-center">
+            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center premium-glow">
+              <Shield className="h-8 w-8 text-white" />
+            </div>
+          </div>
+          <CardTitle className="text-2xl font-bold gradient-text">OpenVPN Admin</CardTitle>
+          <CardDescription className="text-base">
+            Enter your credentials to access the admin panel
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-6">
+          {error && (
+            <div className="flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email
+              </Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="pl-10 h-11"
+                  placeholder="admin@example.com"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium">
+                Password
+              </Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="pl-10 h-11"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full h-11 text-base relative overflow-hidden group"
+              size="lg"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <span className="relative flex items-center gap-2">
+                {loading ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Logging in...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-4 w-4" />
+                    Sign in
+                  </>
+                )}
+              </span>
+            </Button>
+          </form>
+
+          <div className="text-center pt-4 border-t border-border/50">
+            <p className="text-sm text-muted-foreground">Demo credentials:</p>
+            <div className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-lg border border-border/50">
+              <code className="text-sm font-mono text-foreground">admin@example.com</code>
+              <span className="text-muted-foreground">/</span>
+              <code className="text-sm font-mono text-foreground">admin123</code>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}

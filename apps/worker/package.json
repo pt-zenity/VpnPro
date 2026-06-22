@@ -1,0 +1,24 @@
+{
+  "name": "@ovpn/worker",
+  "version": "1.0.0",
+  "description": "Background worker for OpenVPN Admin",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@ovpn/db": "workspace:*",
+    "@ovpn/types": "workspace:*",
+    "axios": "^1.7.9",
+    "bullmq": "^5.29.5",
+    "dotenv": "^16.4.7",
+    "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
+  }
+}
