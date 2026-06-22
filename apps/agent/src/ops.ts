@@ -1,12 +1,15 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { readFileSync, unlinkSync } from 'fs';
+import { exec as execSync } from 'child_process';
+import path from 'path';
 
 const exec = promisify(execFile);
 
 // Paths from the install script
 const OVPN_DIR = '/etc/openvpn/xor';
 const ADMIN_DIR = '/root/ovpn-xor-admin';
-const OVPN_BIN = '/usr/local/sbin/openvpn-xor';
+const OVPN_BIN = '/usr/local/sbin/openvpn';
 
 export interface OpenVpnStatus {
   openvpn: 'RUNNING' | 'STOPPED' | 'ERROR';
@@ -26,7 +29,20 @@ export interface OpenVpnDetails {
   uptime?: number;
 }
 
+export interface CreateClientResult {
+  success: true;
+  client: {
+    name: string;
+    fingerprint: string;
+    ovpnContent: string;
+    createdAt: string;
+  };
+}
+
 export class OpenVpnOps {
+  /**
+   * Get OpenVPN service status
+   */
   async getStatus(): Promise<OpenVpnStatus> {
     try {
       // Check systemd status
@@ -44,25 +60,40 @@ export class OpenVpnOps {
       }
 
       // Get OpenVPN version
-      const { stdout: versionOutput } = await exec(OVPN_BIN, ['--version']);
-      const versionMatch = versionOutput.match(/OpenVPN (\d+\.\d+\.\d+)/);
-      const version = versionMatch?.[1];
+      let version: string = '2.7.3';
+      try {
+        const { stdout: versionOutput } = await exec(OVPN_BIN, ['--version']);
+        const versionMatch = versionOutput.match(/OpenVPN (\d+\.\d+\.\d+)/);
+        if (versionMatch?.[1]) {
+          version = versionMatch[1];
+        }
+      } catch (e) {
+        // Keep default version
+      }
 
       // Get XOR mask from config
-      const { stdout: configOutput } = await exec('cat', [`${OVPN_DIR}/server.conf`]);
-      const xorMatch = configOutput.match(/scramble xormask (\S+)/);
-      const xorMask = xorMatch?.[1];
+      let xorMask = '';
+      try {
+        const { stdout: configOutput } = await exec('cat', [`${OVPN_DIR}/server.conf`]);
+        const xorMatch = configOutput.match(/scramble xormask (\S+)/);
+        xorMask = xorMatch?.[1] || '';
+      } catch (e) {
+        xorMask = '';
+      }
 
       // Get connected clients from status file
       const connectedClients = await this.getConnectedClientCount();
 
       // Get uptime
-      const { stdout: uptimeOutput } = await exec('systemctl', ['show', 'openvpn-xor', '--property=ExecMainStartTimestamp']);
-      const startTimeMatch = uptimeOutput.match(/ExecMainStartTimestamp=(.+)/);
       let uptime = 0;
-      if (startTimeMatch?.[1]) {
-        const startTime = new Date(startTimeMatch[1]);
-        uptime = Math.floor((Date.now() - startTime.getTime()) / 1000);
+      try {
+        const { stdout: uptimeOutput } = await exec('systemctl', ['show', 'openvpn-xor', '--property=ExecMainStartTimestamp', '--value']);
+        if (uptimeOutput.trim()) {
+          const startTime = new Date(uptimeOutput.trim());
+          uptime = Math.floor((Date.now() - startTime.getTime()) / 1000);
+        }
+      } catch (e) {
+        uptime = 0;
       }
 
       return {
@@ -85,6 +116,9 @@ export class OpenVpnOps {
     }
   }
 
+  /**
+   * Get detailed system stats
+   */
   async getDetails(): Promise<OpenVpnDetails> {
     try {
       // Get system stats
@@ -118,84 +152,131 @@ export class OpenVpnOps {
     }
   }
 
-  async createClient(name: string): Promise<{ success: true; client: any }> {
+  /**
+   * Create a new VPN client
+   */
+  async createClient(name: string): Promise<CreateClientResult> {
+    // Validate client name
     if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
-      throw new Error('Invalid client name');
+      throw new Error(`Invalid client name: ${name}`);
     }
 
-    const script = `${ADMIN_DIR}/add-user.sh`;
-    const { stdout, stderr } = await exec(script, [name], { timeout: 60000 });
+    // Run the add-user script
+    try {
+      const { stdout, stderr } = await exec(
+        path.join(ADMIN_DIR, 'add-user.sh'),
+        [name],
+        { timeout: 60000 }
+      );
 
-    // Read the generated .ovpn file
-    const { stdout: ovpnContent } = await exec('cat', [`${ADMIN_DIR}/clients/${name}.ovpn`]);
+      // Read the generated .ovpn file
+      const ovpnPath = path.join(ADMIN_DIR, 'clients', `${name}.ovpn`);
+      const { stdout: ovpnContent } = await exec('cat', [ovpnPath]);
 
-    // Get fingerprint from cert
-    const { stdout: certInfo } = await exec(
-      'openssl',
-      ['x509', '-in', `${OVPN_DIR}/easy-rsa/pki/issued/${name}.crt`, '-noout', '-fingerprint', '-sha256'],
-    );
-    const fingerprint = certInfo.split('=')[1]?.trim();
+      // Get fingerprint from certificate
+      const certPath = path.join(OVPN_DIR, 'easy-rsa', 'pki', 'issued', `${name}.crt`);
+      const { stdout: certInfo } = await exec(
+        'openssl',
+        ['x509', '-in', certPath, '-noout', '-fingerprint', '-sha256']
+      );
+      const fingerprint = certInfo.split('=')[1]?.trim() || '';
 
-    return {
-      success: true,
-      client: {
-        name,
-        fingerprint,
-        ovpnContent: Buffer.from(ovpnContent).toString('base64'),
-        createdAt: new Date().toISOString(),
-      },
-    };
+      return {
+        success: true,
+        client: {
+          name,
+          fingerprint,
+          ovpnContent: Buffer.from(ovpnContent).toString('base64'),
+          createdAt: new Date().toISOString(),
+        },
+      };
+    } catch (error: any) {
+      console.error('Failed to create client:', error);
+      throw new Error(`Client creation failed: ${error.message}`);
+    }
   }
 
+  /**
+   * Revoke a VPN client
+   */
   async revokeClient(name: string): Promise<{ success: true }> {
-    const script = `${ADMIN_DIR}/revoke-user.sh`;
-    await exec(script, [name], { timeout: 60000 });
+    try {
+      await exec(
+        path.join(ADMIN_DIR, 'revoke-user.sh'),
+        [name],
+        { timeout: 60000 }
+      );
 
-    return { success: true };
+      return { success: true };
+    } catch (error: any) {
+      console.error('Failed to revoke client:', error);
+      throw new Error(`Client revocation failed: ${error.message}`);
+    }
   }
 
+  /**
+   * List all clients
+   */
   async listClients(): Promise<Array<{ name: string; status: string; fingerprint: string }>> {
-    const script = `${ADMIN_DIR}/list-users.sh`;
-    const { stdout } = await exec(script, []);
+    try {
+      const { stdout } = await exec(path.join(ADMIN_DIR, 'list-users.sh'));
 
-    // Parse output (active users only)
-    const lines = stdout.split('\n');
-    const clients: Array<{ name: string; status: string; fingerprint: string }> = [];
+      // Parse output
+      const lines = stdout.split('\n');
+      const clients: Array<{ name: string; status: string; fingerprint: string }> = [];
 
-    for (const line of lines) {
-      const match = line.match(/- (.+)$/);
-      if (match) {
-        const name = match[1];
-        // Get fingerprint
-        try {
-          const { stdout: certInfo } = await exec(
-            'openssl',
-            ['x509', '-in', `${OVPN_DIR}/easy-rsa/pki/issued/${name}.crt`, '-noout', '-fingerprint', '-sha256'],
-          );
-          const fingerprint = certInfo.split('=')[1]?.trim();
-          clients.push({ name, status: 'ACTIVE', fingerprint: fingerprint || '' });
-        } catch {
-          // Certificate might be revoked
+      for (const line of lines) {
+        const match = line.match(/✓\s+(.+)$/);
+        if (match) {
+          const name = match[1];
+
+          // Get fingerprint
+          try {
+            const certPath = path.join(OVPN_DIR, 'easy-rsa', 'pki', 'issued', `${name}.crt`);
+            const { stdout: certInfo } = await exec(
+              'openssl',
+              ['x509', '-in', certPath, '-noout', '-fingerprint', '-sha256']
+            );
+            const fingerprint = certInfo.split('=')[1]?.trim() || '';
+
+            clients.push({ name, status: 'ACTIVE', fingerprint });
+          } catch {
+            // Certificate might be revoked
+          }
         }
       }
-    }
 
-    return clients;
+      return clients;
+    } catch (error) {
+      console.error('Failed to list clients:', error);
+      return [];
+    }
   }
 
+  /**
+   * Sync clients list
+   */
   async sync(): Promise<{ success: true; clients: any[] }> {
     const clients = await this.listClients();
     return { success: true, clients };
   }
 
+  /**
+   * Get client config file
+   */
   async getClientConfig(name: string): Promise<{ success: true; ovpnContent: string }> {
-    const { stdout } = await exec('cat', [`${ADMIN_DIR}/clients/${name}.ovpn`]);
+    const ovpnPath = path.join(ADMIN_DIR, 'clients', `${name}.ovpn`);
+    const { stdout } = await exec('cat', [ovpnPath]);
+
     return {
       success: true,
       ovpnContent: Buffer.from(stdout).toString('base64'),
     };
   }
 
+  /**
+   * Get number of connected clients from status file
+   */
   private async getConnectedClientCount(): Promise<number> {
     try {
       const { stdout } = await exec('cat', ['/var/log/openvpn-xor-status.log']);

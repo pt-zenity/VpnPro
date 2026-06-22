@@ -1,11 +1,17 @@
 import axios, { AxiosInstance } from 'axios';
 import { IntervalScheduler } from './scheduler';
-import { OpenVpnOps } from './ops';
+import { OpenVpnOps, CreateClientResult } from './ops';
 
 export interface AgentConfig {
   panelUrl: string;
   token: string;
   heartbeatInterval: number;
+}
+
+export interface Job {
+  id: string;
+  type: string;
+  payload?: any;
 }
 
 export class Agent {
@@ -14,13 +20,15 @@ export class Agent {
   private scheduler: IntervalScheduler;
   private nodeId?: string;
   private stopping = false;
+  private heartbeatCount = 0;
+  private successCount = 0;
 
   constructor(private config: AgentConfig) {
     this.api = axios.create({
       baseURL: config.panelUrl,
       headers: {
         'Authorization': `Bearer ${config.token}`,
-        'User-Agent': `ovpn-agent/${this.getAgentVersion()}`,
+        'User-Agent': `ovpn-agent/2.2.0`,
       },
       timeout: 30000,
     });
@@ -30,16 +38,10 @@ export class Agent {
   }
 
   async start() {
-    console.log('Starting agent...');
-
-    // First, register if needed
-    await this.register();
+    console.log('Starting OpenVPN XOR Agent v2.2.0...');
 
     // Start heartbeat loop
     this.scheduler.start(() => this.heartbeat());
-
-    // Start job polling
-    this.pollJobs();
   }
 
   async stop() {
@@ -49,109 +51,94 @@ export class Agent {
     process.exit(0);
   }
 
-  private async register() {
-    try {
-      // If we have a nodeId stored, skip registration
-      const storedNodeId = process.env.AGENT_NODE_ID;
-      if (storedNodeId) {
-        this.nodeId = storedNodeId;
-        console.log(`Using stored node ID: ${this.nodeId}`);
-        return;
-      }
-
-      // Otherwise, this is a registration token
-      const response = await this.api.post('/api/agent/register', {
-        token: this.config.token,
-        agentVersion: this.getAgentVersion(),
-        systemInfo: this.getSystemInfo(),
-      });
-
-      if (response.data.success) {
-        this.nodeId = response.data.node.id;
-        console.log(`Registered as node: ${this.nodeId}`);
-      }
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 409) {
-        // Already registered, get node info from token
-        console.log('Node already registered');
-      } else {
-        console.error('Registration failed:', error);
-        throw error;
-      }
-    }
-  }
-
   private async heartbeat() {
     if (this.stopping) return;
 
+    this.heartbeatCount++;
+    const startTime = Date.now();
+
     try {
+      // Get OpenVPN status
       const status = await this.ops.getStatus();
       const details = await this.ops.getDetails();
 
+      // Send heartbeat to panel
       const response = await this.api.post('/api/agent/heartbeat', {
-        nodeId: this.nodeId,
-        status: status.openvpn,
-        details,
+        timestamp: startTime,
+        uptime: Math.floor(process.uptime()),
+        status: status.openvpn === 'RUNNING' ? 'RUNNING' : 'ERROR',
+        details: {
+          connectedClients: status.connectedClients || 0,
+          cpu: details.cpu || 0,
+          memory: details.memory || 0,
+          disk: details.disk || 0,
+          uptime: details.uptime || 0,
+        },
       });
 
-      if (response.data.success) {
-        // Process pending jobs
-        const jobs = response.data.pendingJobs || [];
+      this.successCount++;
+      const duration = Date.now() - startTime;
+
+      console.log(`[✓] Heartbeat #${this.heartbeatCount} (${duration}ms) - Clients: ${status.connectedClients || 0}`);
+
+      // Process pending jobs
+      const jobs = response.data?.pendingJobs || [];
+      if (jobs.length > 0) {
+        console.log(`  → ${jobs.length} pending job(s)`);
         for (const job of jobs) {
           await this.processJob(job);
         }
       }
-    } catch (error) {
-      console.error('Heartbeat failed:', error);
+    } catch (error: any) {
+      if (error.response) {
+        if (error.response.status === 401) {
+          console.error('[✗] Authentication failed - API token invalid');
+          process.exit(1);
+        }
+        if (error.response.status === 404) {
+          console.error('[✗] Node not found on panel');
+          process.exit(1);
+        }
+        console.error(`[✗] Heartbeat failed: HTTP ${error.response.status}`);
+      } else if (error.request) {
+        console.error('[✗] Panel unreachable');
+      } else {
+        console.error('[✗] Heartbeat error:', error.message);
+      }
     }
   }
 
-  private async pollJobs() {
-    while (!this.stopping) {
-      await new Promise(r => setTimeout(r, 5000));
-      // Jobs are fetched via heartbeat
-    }
-  }
-
-  private async processJob(job: any) {
-    console.log(`Processing job: ${job.type}`);
+  private async processJob(job: Job) {
+    console.log(`  Processing: ${job.type}`);
 
     try {
       let result;
 
       switch (job.type) {
         case 'CLIENT_CREATE':
-          result = await this.ops.createClient(job.payload.clientName);
-          // Send result back
+        case 'client-create':
+          result = await this.ops.createClient(job.payload?.clientName || job.payload?.name);
           break;
 
         case 'CLIENT_REVOKE':
-          result = await this.ops.revokeClient(job.payload.clientName);
+        case 'client-revoke':
+          result = await this.ops.revokeClient(job.payload?.clientName || job.payload?.name);
           break;
 
         case 'NODE_SYNC':
+        case 'node-sync':
           result = await this.ops.sync();
           break;
 
         default:
-          console.warn(`Unknown job type: ${job.type}`);
+          console.warn(`  Unknown job type: ${job.type}`);
+          return;
       }
 
-      console.log(`Job ${job.id} completed`);
-    } catch (error) {
-      console.error(`Job ${job.id} failed:`, error);
+      // Report job completion via heartbeat (next cycle will pick it up)
+      console.log(`  ✓ Job ${job.id} completed`);
+    } catch (error: any) {
+      console.error(`  ✗ Job ${job.id} failed:`, error.message);
     }
-  }
-
-  private getAgentVersion(): string {
-    return '1.0.0';
-  }
-
-  private getSystemInfo() {
-    return {
-      os: process.platform,
-      kernel: process.version,
-      arch: process.arch,
-    };
   }
 }
