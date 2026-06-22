@@ -120,7 +120,7 @@ echo "  Calling ${PANEL_URL}/api/agent/register ..."
 
 REGISTER_RESPONSE=$(curl -s -X POST "${PANEL_URL}/api/agent/register" \
   -H "Content-Type: application/json" \
-  -d "{\"token\":\"${REGISTRATION_TOKEN}\",\"agentVersion\":\"${AGENT_VERSION}\",\"systemInfo\":{\"platform\":\"${OS}\",\"version\":\"${OS_VERSION}\",\"arch\":\"$(uname -m)\",\"nodeVersion\":\"${NODE_VERSION}\"}}" 2>&1)
+  -d "{\"token\":\"${REGISTRATION_TOKEN}\",\"agentVersion\":\"${AGENT_VERSION}\",\"systemInfo\":{\"os\":\"${OS}\",\"kernel\":\"${OS_VERSION}\",\"arch\":\"$(uname -m)\"}}" 2>&1)
 
 if [[ $? -ne 0 ]]; then
     echo -e "${RED}✗ Registration request failed${NC}"
