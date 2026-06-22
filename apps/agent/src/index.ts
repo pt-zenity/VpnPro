@@ -5,7 +5,7 @@ async function main() {
   console.log('');
   console.log('╔════════════════════════════════════════════════════════════╗');
   console.log('║                                                              ║');
-  console.log('║              OpenVPN XOR Agent v2.2.0                        ║');
+  console.log('║              OpenVPN XOR Agent v3.1.0                        ║');
   console.log('║                                                              ║');
   console.log('╚════════════════════════════════════════════════════════════╝');
   console.log('');

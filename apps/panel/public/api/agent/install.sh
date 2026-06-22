@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # OpenVPN Admin Panel - Complete Node Installation Script
-# Version: 3.0.0 - Production Ready with Automatic OpenVPN XOR
+# Version: 3.1.0 - Production Ready with Firewall Configuration
 # =============================================================================
 
 set -e
@@ -15,7 +15,7 @@ MAGENTA='\033[0;35m'
 NC='\033[0m'
 
 # Configuration
-AGENT_VERSION="3.0.0"
+AGENT_VERSION="3.1.0"
 AGENT_DIR="/opt/ovpn-agent"
 REPO_URL="https://github.com/tunnect-spec/ovpn-admin"
 
@@ -103,7 +103,8 @@ if [[ "$OS" == "ubuntu" ]] || [[ "$OS" == "debian" ]]; then
         ca-certificates \
         uuid-runtime \
         nodejs \
-        npm 2>/dev/null || true
+        npm \
+        iptables-persistent 2>/dev/null || true
 
     # Ensure Node.js 20.x
     if ! command -v node &> /dev/null || [ $(node -v | cut -d'v' -f2 | cut -d'.' -f1) -lt 18 ]; then
@@ -345,11 +346,44 @@ EOFSVC
 sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1
 echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-openvpn.conf
 
-# Setup NAT
+# Configure firewall and NAT
 MAIN_INTERFACE=$(ip route | grep default | awk '{print $5}' | head -1)
+
+# Allow OpenVPN traffic
+iptables -A INPUT -p udp --dport 443 -j ACCEPT 2>/dev/null || true
+iptables -A INPUT -i tun0 -j ACCEPT 2>/dev/null || true
+
+# Setup NAT for VPN clients
 iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o ${MAIN_INTERFACE} -j MASQUERADE 2>/dev/null || true
 iptables -A FORWARD -i tun0 -j ACCEPT 2>/dev/null || true
 iptables -A FORWARD -o tun0 -j ACCEPT 2>/dev/null || true
+
+# Save iptables rules
+echo -e "  ${CYAN}Saving firewall rules...${NC}"
+if [[ "$OS" == "ubuntu" ]] || [[ "$OS" == "debian" ]]; then
+    iptables-save > /etc/iptables/rules.v4 2>/dev/null || \
+    iptables-save > /etc/iptables.up.rules 2>/dev/null || true
+
+    # Create netplan rules for persistent firewall on Ubuntu
+    if command -v netplan &> /dev/null; then
+        cat > /etc/netplan/99-openvpn-firewall.yaml << 'EOF' 2>/dev/null || true
+network:
+  version: 2
+  ethernets:
+    all:
+      firewall: true
+      rules:
+        - port: 443
+          protocol: udp
+          accept: true
+EOF
+    fi
+elif [[ "$OS" == "centos" ]] || [[ "$OS" == "rhel" ]] || [[ "$OS" == "rocky" ]] || [[ "$OS" == "almalinux" ]]; then
+    service iptables save 2>/dev/null || \
+    iptables-save > /etc/sysconfig/iptables 2>/dev/null || true
+fi
+
+echo -e "  ${GREEN}✓ Firewall configured${NC}"
 
 # Reload systemd and start OpenVPN
 systemctl daemon-reload
@@ -800,10 +834,9 @@ if systemctl is-active --quiet ovpn-agent && systemctl is-active --quiet openvpn
     echo "  OpenVPN:  systemctl status openvpn-xor"
     echo "  Agent:    systemctl status ovpn-agent"
     echo ""
-    echo -e "${YELLOW}⚠️  Don't forget to:${NC}"
-    echo "  1. Open port 443/udp in your firewall"
-    echo "  2. Check panel: node should appear as HEALTHY"
-    echo "  3. Create first client from the panel!"
+    echo -e "${YELLOW}⚠️  Next steps:${NC}"
+    echo "  1. Check panel: node should appear as HEALTHY"
+    echo "  2. Create first client from the panel!"
     echo ""
 
     echo -e "${GREEN}Your VPN server is ready!${NC}"

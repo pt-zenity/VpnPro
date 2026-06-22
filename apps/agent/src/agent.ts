@@ -28,7 +28,7 @@ export class Agent {
       baseURL: config.panelUrl,
       headers: {
         'Authorization': `Bearer ${config.token}`,
-        'User-Agent': `ovpn-agent/2.2.0`,
+        'User-Agent': `ovpn-agent/3.1.0`,
       },
       timeout: 30000,
     });
@@ -135,10 +135,30 @@ export class Agent {
           return;
       }
 
-      // Report job completion via heartbeat (next cycle will pick it up)
+      // Report job completion to panel
+      await this.reportJobCompletion(job.id, true, result);
       console.log(`  ✓ Job ${job.id} completed`);
     } catch (error: any) {
       console.error(`  ✗ Job ${job.id} failed:`, error.message);
+      // Report job failure to panel
+      await this.reportJobCompletion(job.id, false, null, error.message);
+    }
+  }
+
+  private async reportJobCompletion(
+    jobId: string,
+    success: boolean,
+    result?: any,
+    error?: string
+  ) {
+    try {
+      await this.api.post(`/api/agent/jobs/${jobId}/complete`, {
+        success,
+        result,
+        error,
+      });
+    } catch (err) {
+      console.error(`  Failed to report job completion:`, err);
     }
   }
 }
