@@ -368,6 +368,13 @@ else
     echo "disabled" > "$OVPN_DIR/xormask.txt"
 fi
 
+# Determine correct unprivileged group
+if grep -q "^nogroup:" /etc/group; then
+    OVPN_GROUP="nogroup"
+else
+    OVPN_GROUP="nobody"
+fi
+
 # Create server config
 cat > "$OVPN_DIR/server.conf" << EOF
 port 443
@@ -397,7 +404,7 @@ status /var/log/openvpn-xor-status.log
 verb 3
 
 user nobody
-group nogroup
+group $OVPN_GROUP
 EOF
 
 # Add scramble line if XOR support is enabled
@@ -590,6 +597,13 @@ cd "$AGENT_DIR"
 # Save API token
 echo "$API_TOKEN" > "$AGENT_DIR/.api_token"
 chmod 600 "$AGENT_DIR/.api_token"
+
+# Report installation success to Panel
+echo -e "  ${CYAN}Reporting installation success to panel...${NC}"
+curl -s -X POST "${PANEL_URL}/api/agent/install" \
+  -H "Authorization: Bearer ${API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{\"success\":true,\"version\":\"${OVPN_VERSION}\",\"xorMask\":\"${XOR_MASK}\"}" > /dev/null || true
 
 # Create agent package
 cat > package.json << 'EOFPKG'
