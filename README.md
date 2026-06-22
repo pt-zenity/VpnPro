@@ -52,10 +52,10 @@ Self-hosted admin panel for managing OpenVPN XOR nodes.
 
 ```bash
 # Quick install with auto-configuration
-curl -fsSL https://raw.githubusercontent.com/tunnect-spec/ovpn-admin/main/quick-install.sh | sudo bash
+curl -fsSL https://github.com/tunnect-spec/ovpn-admin/raw/main/quick-install.sh | sudo bash
 
 # Or with custom domain
-curl -fsSL https://raw.githubusercontent.com/tunnect-spec/ovpn-admin/main/quick-install.sh | \
+curl -fsSL https://github.com/tunnect-spec/ovpn-admin/raw/main/quick-install.sh | \
   sudo DOMAIN=vpn.example.com bash
 ```
 
