@@ -33,29 +33,5 @@ export async function processNodeInstallJob(job: Job<NodeInstallJobData>) {
   // For MVP: Mark as installed (in production, agent would actually install)
   // The install script would be triggered on the agent side
   // For now, we simulate completion
-
-  await prisma.node.update({
-    where: { id: node.id },
-    data: {
-      status: 'HEALTHY',
-      installedAt: new Date(),
-      openvpnVersion: '2.7.3',
-      xorMask: crypto.randomUUID().replace(/-/g, '').substring(0, 28),
-    },
-  });
-
-  // Update job
-  await prisma.job.update({
-    where: { id: jobId },
-    data: {
-      status: 'COMPLETED',
-      completedAt: new Date(),
-      result: {
-        version: '2.7.3',
-        xorMask: 'simulated',
-      },
-    },
-  });
-
-  return { success: true };
+  throw new Error('NODE_INSTALL jobs should be processed by the Agent, not the Worker.');
 }

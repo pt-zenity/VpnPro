@@ -40,13 +40,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Determine new status
+    let newStatus = node.status;
+    if (input.status === 'RUNNING') {
+      newStatus = 'HEALTHY';
+    } else if (input.status === 'ERROR') {
+      newStatus = 'ERROR';
+    } else if (node.status === 'PENDING') {
+      newStatus = 'PROVISIONING';
+    }
+
     // Update heartbeat
     const now = new Date();
     await prisma.node.update({
       where: { id: nodeId },
       data: {
         lastHeartbeatAt: now,
-        status: node.status === 'PENDING' ? 'PROVISIONING' : node.status,
+        status: newStatus,
+        installedAt: newStatus === 'HEALTHY' && !node.installedAt ? now : node.installedAt,
       },
     });
 
