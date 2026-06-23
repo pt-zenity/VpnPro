@@ -396,7 +396,6 @@ push "dhcp-option DNS 8.8.8.8"
 push "dhcp-option DNS 8.8.4.4"
 
 keepalive 10 120
-cipher AES-256-GCM
 auth SHA256
 data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
 data-ciphers-fallback AES-256-GCM
@@ -409,11 +408,11 @@ verb 3
 
 user nobody
 group $OVPN_GROUP
+
+${XOR_LINE}
 EOF
 
-# Add scramble line if XOR support is enabled
 if [ "$XOR_SUPPORT" -eq 1 ] && [ -n "$XOR_MASK" ]; then
-    sed -i "/^data-ciphers/a\\scramble xormask $XOR_MASK" "$OVPN_DIR/server.conf"
     echo -e "  ${GREEN}✓ PKI initialized${NC}"
     echo -e "  ${GREEN}✓ Config created with XOR mask: ${XOR_MASK}${NC}"
 else
