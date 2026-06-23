@@ -110,7 +110,7 @@ export default function NodesPage() {
 
       {/* Stats Overview */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="glass">
+        <Card className="bg-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">

@@ -52,8 +52,29 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
           port: input.port,
           protocol: input.protocol,
           firstUser: input.firstUser,
+          useXor: input.useXor,
+          domain: input.domain,
+          dnsMode: input.dnsMode,
+          customDns: input.customDns,
+          mtu: input.mtu,
+          mssfix: input.mssfix,
+          restore: !!node.pkiBackup,
         },
         maxAttempts: 3,
+      },
+    });
+
+    // Update node status and save settings
+    await prisma.node.update({
+      where: { id },
+      data: { 
+        status: 'PROVISIONING',
+        useXor: input.useXor,
+        domain: input.domain || null,
+        dnsServers: input.dnsMode === 'standard' ? ['8.8.8.8', '1.1.1.1'] : 
+                    input.dnsMode === 'custom' && input.customDns ? input.customDns.split(',').map(s => s.trim()) : [],
+        mtu: input.mtu,
+        mssfix: input.mssfix,
       },
     });
 
@@ -63,12 +84,6 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
       priority: 10,
       attempts: 3,
       backoff: { type: 'exponential', delay: 60000 },
-    });
-
-    // Update node status
-    await prisma.node.update({
-      where: { id },
-      data: { status: 'PROVISIONING' },
     });
 
     // Audit log

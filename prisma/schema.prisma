@@ -60,13 +60,19 @@ model Node {
   version        String?
   openvpnVersion String?
   xorMask        String?
+  domain         String?
+  useXor         Boolean      @default(true)
+  dnsServers     String[]     @default(["8.8.8.8", "1.1.1.1"])
+  mtu            Int          @default(1500)
+  mssfix         Int          @default(1360)
 
   lastHeartbeatAt DateTime?
   installedAt     DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
-  metadata Json?
+  metadata  Json?
+  pkiBackup Bytes?
 
   authTokens   NodeAuthToken[]
   clients      VpnClient[]
@@ -157,6 +163,9 @@ model Job {
   payload    Json
   result     Json?
   error      String?
+
+  progress        Int?     @default(0)
+  progressMessage String?
 
   startedAt   DateTime?
   completedAt DateTime?

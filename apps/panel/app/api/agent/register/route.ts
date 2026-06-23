@@ -51,12 +51,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (node.status !== 'PENDING') {
-      return NextResponse.json(
-        { error: 'NODE_ALREADY_REGISTERED', message: 'Node already registered' },
-        { status: 409 },
-      );
-    }
+    // Allow re-registration for existing nodes (Migration)
+    // We just update the API token.
 
     // Mark token as used
     await prisma.nodeAuthToken.update({
@@ -71,10 +67,11 @@ export async function POST(request: NextRequest) {
     await prisma.node.update({
       where: { id: node.id },
       data: {
-        status: 'PROVISIONING',
+        status: 'PENDING',
         version: input.agentVersion,
         lastHeartbeatAt: new Date(),
         apiToken: hashedApiToken,
+        metadata: input.systemInfo ? (input.systemInfo as any) : undefined,
       },
     });
 

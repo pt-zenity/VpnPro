@@ -68,6 +68,12 @@ export const installNodeSchema = z.object({
   port: z.number().int().min(1).max(65535).optional().default(443),
   protocol: z.enum(['udp', 'tcp']).optional().default('udp'),
   firstUser: clientNameSchema.optional(),
+  useXor: z.boolean().optional().default(true),
+  domain: z.string().optional(),
+  dnsMode: z.enum(['standard', 'empty', 'custom']).optional().default('standard'),
+  customDns: z.string().optional(),
+  mtu: z.number().int().min(500).max(9000).optional().default(1500),
+  mssfix: z.number().int().min(500).max(9000).optional().default(1360),
 });
 
 export type InstallNodeInput = z.infer<typeof installNodeSchema>;

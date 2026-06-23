@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { InstallNodeDialog } from './InstallNodeDialog';
 
 interface NodeDetails {
   id: string;
@@ -11,6 +12,7 @@ interface NodeDetails {
   status: string;
   version: string | null;
   openvpnVersion: string | null;
+  metadata?: unknown;
   xorMask: string | null;
   lastHeartbeatAt: string | null;
   installedAt: string | null;
@@ -51,6 +53,11 @@ export default function NodeDetailsPage() {
   const [node, setNode] = useState<NodeDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState(false);
+  const [showInstallDialog, setShowInstallDialog] = useState(false);
+  const [showMigrateDialog, setShowMigrateDialog] = useState(false);
+  const [migrateToken, setMigrateToken] = useState('');
+  const [installProgress, setInstallProgress] = useState(0);
+  const [installMessage, setInstallMessage] = useState('');
 
   const fetchNode = async () => {
     const admin = localStorage.getItem('admin');
@@ -90,31 +97,30 @@ export default function NodeDetailsPage() {
     return () => clearInterval(interval);
   }, [nodeId]);
 
-  const handleInstall = async () => {
-    if (!confirm('Install OpenVPN on this node?')) return;
-    setInstalling(true);
+  useEffect(() => {
+    if (node?.status !== 'PROVISIONING') return;
 
-    const res = await fetch(`/api/nodes/${nodeId}/install`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        serverHost: node?.host,
-        port: 443,
-        protocol: 'udp',
-      }),
-    });
+    const fetchProgress = async () => {
+      try {
+        const res = await fetch(`/api/nodes/${nodeId}/install-progress`);
+        if (res.ok) {
+          const data = await res.json();
+          setInstallProgress(data.progress);
+          setInstallMessage(data.message);
+          if (data.status !== 'PENDING') {
+            fetchNode();
+          }
+        }
+      } catch (err) {}
+    };
 
-    if (res.ok) {
-      // Refresh immediately
-      fetchNode();
-    } else {
-      const data = await res.json();
-      alert(data.message || 'Failed to start install');
-    }
+    fetchProgress();
+    const interval = setInterval(fetchProgress, 2000);
+    return () => clearInterval(interval);
+  }, [node?.status, nodeId]);
 
-    setInstalling(false);
+  const handleInstall = () => {
+    setShowInstallDialog(true);
   };
 
   const handleDelete = async () => {
@@ -132,6 +138,23 @@ export default function NodeDetailsPage() {
     }
   };
 
+  const handleMigrate = async () => {
+    if (!confirm('This will disconnect the current server and prepare the panel for a new server. Are you sure?')) return;
+    try {
+      const res = await fetch(`/api/nodes/${nodeId}/migrate-token`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        setMigrateToken(data.token);
+        setShowMigrateDialog(true);
+        fetchNode();
+      } else {
+        alert(data.message || 'Failed to generate migrate token');
+      }
+    } catch (e) {
+      alert('Error generating token');
+    }
+  };
+
   if (loading) {
     return <div className="text-center py-12">Loading...</div>;
   }
@@ -145,6 +168,43 @@ export default function NodeDetailsPage() {
 
   return (
     <div className="space-y-6">
+      {showInstallDialog && node && (
+        <InstallNodeDialog
+          nodeId={node.id}
+          defaultHost={node.host}
+          onClose={() => setShowInstallDialog(false)}
+          onSuccess={() => {
+            setShowInstallDialog(false);
+            fetchNode();
+          }}
+        />
+      )}
+
+      {showMigrateDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card text-card-foreground p-6 rounded-lg shadow-lg max-w-xl w-full border border-border">
+            <h3 className="text-xl font-bold mb-4">Migrate Server</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Run the following command on your <strong>new</strong> empty Ubuntu server. This will install the agent, link it to this Node, and restore all PKI keys so existing clients continue to work.
+            </p>
+            <div className="bg-black/50 p-3 rounded-md mb-6 relative group overflow-hidden">
+              <code className="text-xs text-green-400 break-all select-all block">
+                curl -fsSL {window.location.origin}/api/agent/install.sh | AGENT_TOKEN={migrateToken} PANEL_URL={window.location.origin} bash
+              </code>
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowMigrateDialog(false)}
+                className="px-4 py-2 border border-border rounded-md hover:bg-secondary/50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3">
@@ -179,11 +239,30 @@ export default function NodeDetailsPage() {
         </div>
       </div>
 
+      {node.status === 'PROVISIONING' && (
+        <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="font-semibold text-lg">Installing OpenVPN</h3>
+            <span className="text-sm font-medium">{installProgress}%</span>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">{installMessage || 'Please wait...'}</p>
+          <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
+            <div 
+              className="bg-primary h-3 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${installProgress}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <DetailCard label="Host / IP" value={node.host} />
-        <DetailCard label="Port" value={node.port?.toString() || '22'} />
         <DetailCard label="Agent Version" value={node.version || '-'} />
         <DetailCard label="OpenVPN" value={node.openvpnVersion || '-'} />
+        <DetailCard 
+          label="System" 
+          value={node.metadata ? `${(node.metadata as any).os || 'Unknown OS'} (${(node.metadata as any).arch || 'Unknown Arch'})` : '-'} 
+        />
         <DetailCard
           label="Last Heartbeat"
           value={node.lastHeartbeatAt ? new Date(node.lastHeartbeatAt).toLocaleString() : 'Never'}
@@ -244,6 +323,13 @@ export default function NodeDetailsPage() {
             className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-md font-medium"
           >
             Delete Node
+          </button>
+          <button
+            onClick={handleMigrate}
+            className="px-4 py-2 bg-yellow-600 text-white hover:bg-yellow-700 rounded-md font-medium ml-auto"
+            title="Move this Node and its clients to a new physical server"
+          >
+            Migrate Server
           </button>
         </div>
       </div>

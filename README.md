@@ -1,6 +1,6 @@
 # OpenVPN Admin Panel
 
-Self-hosted admin panel for managing OpenVPN XOR nodes.
+Self-hosted admin panel for managing OpenVPN XOR nodes with seamless migration and real-time monitoring.
 
 ## Architecture
 
@@ -25,12 +25,15 @@ Self-hosted admin panel for managing OpenVPN XOR nodes.
 
 ## Features
 
-- **Multi-node management** - Add and manage multiple VPN servers
-- **Client lifecycle** - Create, revoke, and download .ovpn configs
-- **Agent-based** - Secure polling communication (works behind NAT)
-- **Audit logging** - Track all administrative actions
-- **Job queue** - Background operations with retry logic
-- **Stateless** - Multiple panel instances supported
+- **Multi-node Management** - Add and manage multiple VPN servers from a single dashboard.
+- **OpenVPN XOR Patch** - Built-in support for XOR Scramble Mask to bypass Deep Packet Inspection (DPI) and firewalls.
+- **Seamless Server Migration** - Automatically back up PKI (certificates/keys) to the database. Deploy a new VPS and migrate your node with 1 click without breaking existing client `.ovpn` files!
+- **Client Lifecycle Management** - Create, revoke (with fully working CRL validation), and download `.ovpn` configs easily.
+- **Agent-based Architecture** - Secure polling communication using JWT tokens (works seamlessly behind NAT).
+- **Live Installation Progress** - Real-time progress bars when deploying OpenVPN to new nodes.
+- **System Monitoring** - View server OS, Architecture, CPU, RAM, and Uptime directly in the panel.
+- **Audit Logging** - Track all administrative actions.
+- **Job Queue** - Background operations with BullMQ and retry logic.
 
 ## Tech Stack
 
@@ -64,7 +67,7 @@ This will:
 - Generate secure secrets
 - Set up PostgreSQL + Redis
 - Build and start all services
-- Create admin user with generated password
+- Create an admin user with a generated password
 
 ### Option B: Manual Installation
 
@@ -77,19 +80,13 @@ cp .env.example .env
 # Edit .env with your settings
 ```
 
-### 2. Start Services
+#### 2. Start Services
 
 ```bash
 docker-compose up -d
 ```
 
-This starts:
-- PostgreSQL on port 5432
-- Redis on port 6379
-- Panel on http://localhost:3000
-- Background worker
-
-### 3. Create Admin User
+#### 3. Create Admin User
 
 ```bash
 docker exec -it ovpn-admin-panel npx prisma db push
@@ -109,27 +106,29 @@ docker exec -it ovpn-admin-panel node -e "
 "
 ```
 
-### 4. Add Your First Node
+#### 4. Add Your First Node
 
 1. Login at http://localhost:3000/login
 2. Go to Nodes → Add Node
 3. Enter name and host
 4. Copy the install command
-5. Run on your VPN server (as root):
-   ```bash
-   curl -fsSL https://panel.example.com/install-agent.sh | \
-   AGENT_TOKEN=<token> PANEL_URL=https://panel.example.com bash
-   ```
-6. Wait for node status to become HEALTHY
+5. Run on your VPN server (as root)
+6. Wait for node status to become `PENDING`
 
-### 5. Install OpenVPN (Optional)
-
-If the node doesn't have OpenVPN XOR installed yet:
+#### 5. Install OpenVPN
 
 1. Go to Node Details → Install OpenVPN
-2. Enter server host (domain or IP)
-3. Wait for job completion
-4. First client will be created automatically
+2. Configure Port, Protocol, XOR mask, and DNS options
+3. Watch the live progress bar!
+4. The first client will be created automatically.
+
+### Server Migration
+
+Is your server IP blocked? You can migrate it effortlessly:
+1. Go to Node Details -> Migrate Server.
+2. Confirm the action to receive a new migration token.
+3. Run the provided command on your **new** clean VPS.
+4. The panel will automatically inject your old CA/Certificates into the new server. Clients will reconnect immediately once you update your DNS records!
 
 ## Project Structure
 
@@ -149,46 +148,14 @@ ovpn-admin/
     └── schema.prisma   # Database schema
 ```
 
-## API Endpoints
-
-### Panel API
-- `POST /api/auth/login` - Admin login
-- `GET /api/nodes` - List nodes
-- `POST /api/nodes` - Create node
-- `GET /api/nodes/:id` - Node details
-- `POST /api/nodes/:id/install` - Install OpenVPN
-- `GET /api/nodes/:nodeId/clients` - List clients
-- `POST /api/nodes/:nodeId/clients` - Create client
-- `DELETE /api/clients/:id` - Revoke client
-- `GET /api/clients/:id/download` - Download .ovpn
-- `GET /api/jobs` - List jobs
-- `GET /api/audit-logs` - Audit history
-
-### Agent API
-- `POST /api/agent/register` - Node registration
-- `POST /api/agent/heartbeat` - Health check
-- `POST /api/agent/create-client` - Create VPN client
-- `POST /api/agent/revoke-client` - Revoke VPN client
-
-## Configuration
-
-Environment variables (see `.env.example`):
-
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `REDIS_URL` | Redis connection string |
-| `JWT_SECRET` | JWT signing secret |
-| `ENCRYPTION_KEY` | API token encryption (32 bytes hex) |
-| `NEXT_PUBLIC_APP_URL` | Panel base URL |
-
 ## Security Notes
 
-- All agent communication uses HTTPS + token auth
-- API tokens are encrypted at rest (AES-256-GCM)
-- Registration tokens are one-time, expire in 24h
-- All admin actions are logged
-- Agent runs with whitelisted commands only
+- Full default traffic tunneling (`redirect-gateway def1 bypass-dhcp`).
+- Proper Revocation Lists (`crl-verify`).
+- All agent communication uses HTTPS + token auth.
+- API tokens are encrypted at rest (AES-256-GCM).
+- Registration tokens are one-time, expire in 24h.
+- PKI Backup blobs are stored securely in the PostgreSQL database.
 
 ## License
 
