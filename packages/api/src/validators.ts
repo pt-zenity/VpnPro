@@ -51,14 +51,14 @@ export const createNodeSchema = z.object({
   name: nodeNameSchema,
   host: hostSchema,
   port: z.number().int().min(1).max(65535).optional().default(22),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type CreateNodeInput = z.infer<typeof createNodeSchema>;
 
 export const updateNodeSchema = z.object({
   name: nodeNameSchema.optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type UpdateNodeInput = z.infer<typeof updateNodeSchema>;

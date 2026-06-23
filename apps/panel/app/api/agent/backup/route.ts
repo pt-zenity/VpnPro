@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@ovpn/db';
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+
 
 async function authenticate(request: Request) {
   const authHeader = request.headers.get('authorization');

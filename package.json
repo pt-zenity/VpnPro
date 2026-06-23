@@ -16,16 +16,19 @@
     "docker:logs": "docker compose -f docker/compose.yml logs -f"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "prisma": "^6.1.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "concurrently": "^10.0.3",
+    "prisma": "^7.8.0",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
   },
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
   "dependencies": {
-    "@prisma/client": "6.19.3"
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "7.8.0",
+    "@types/pg": "^8.20.0",
+    "pg": "^8.22.0"
   }
 }
