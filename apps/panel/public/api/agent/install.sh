@@ -406,9 +406,6 @@ persist-tun
 status /var/log/openvpn-xor-status.log
 verb 3
 
-user nobody
-group $OVPN_GROUP
-
 ${XOR_LINE}
 EOF
 
@@ -431,6 +428,12 @@ Type=simple
 ExecStart=/usr/local/sbin/openvpn --config $OVPN_DIR/server.conf --writepid /run/openvpn-xor.pid
 ExecReload=/bin/kill -HUP \$MAINPID
 PIDFile=/run/openvpn-xor.pid
+LimitNPROC=100
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW CAP_SETGID CAP_SETUID CAP_SETPCAP
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_BIND_SERVICE CAP_NET_RAW
+DeviceAllow=/dev/net/tun rw
+ProtectSystem=false
+ProtectHome=false
 Restart=always
 RestartSec=5
 TimeoutStartSec=30
