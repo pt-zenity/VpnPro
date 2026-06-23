@@ -14,11 +14,11 @@ interface Job {
 }
 
 const statusColors: Record<Job['status'], string> = {
-  PENDING: 'text-gray-400',
+  PENDING: 'text-muted-foreground',
   RUNNING: 'text-primary',
-  COMPLETED: 'text-success',
-  FAILED: 'text-error',
-  CANCELLED: 'text-gray-400',
+  COMPLETED: 'text-emerald-500',
+  FAILED: 'text-destructive',
+  CANCELLED: 'text-muted-foreground',
 };
 
 export default function JobsPage() {
@@ -77,11 +77,11 @@ export default function JobsPage() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Jobs</h2>
-          <p className="text-gray-400 mt-1">Background job history</p>
+          <p className="text-muted-foreground mt-1">Background job history</p>
         </div>
         <button
           onClick={fetchJobs}
-          className="px-4 py-2 bg-bg-tertiary hover:bg-bg-tertiary/80 border border-border rounded-lg"
+          className="px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border rounded-md"
         >
           Refresh
         </button>
@@ -90,30 +90,30 @@ export default function JobsPage() {
       {loading ? (
         <div className="text-center py-12">Loading...</div>
       ) : jobs.length === 0 ? (
-        <div className="bg-bg-secondary border border-border rounded-lg p-12 text-center">
-          <p className="text-gray-400">No jobs yet</p>
+        <div className="bg-card text-card-foreground border border-border rounded-lg p-12 text-center">
+          <p className="text-muted-foreground">No jobs yet</p>
         </div>
       ) : (
-        <div className="bg-bg-secondary border border-border rounded-lg overflow-hidden">
+        <div className="bg-card text-card-foreground border border-border rounded-lg overflow-hidden">
           <table className="w-full">
-            <thead className="bg-bg-tertiary">
+            <thead className="bg-muted">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Type
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Node
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Created
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Duration
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Actions
                 </th>
               </tr>
@@ -127,28 +127,28 @@ export default function JobsPage() {
                     : '-';
 
                 return (
-                  <tr key={job.id} className="hover:bg-bg-tertiary/50">
-                    <td className="px-6 py-4 whitespace-nowrap font-mono text-sm">{job.type}</td>
+                  <tr key={job.id} className="hover:bg-muted/50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap font-mono text-sm text-foreground">{job.type}</td>
                     <td className="px-6 py-4 whitespace-nowrap">{job.nodeName}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={statusColors[job.status]}>{job.status}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                       {new Date(job.createdAt).toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                       {duration}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {job.status === 'PENDING' || job.status === 'RUNNING' ? (
                         <button
                           onClick={() => handleCancel(job.id)}
-                          className="text-error hover:text-error-600"
+                          className="text-destructive hover:text-destructive/80"
                         >
                           Cancel
                         </button>
                       ) : job.error ? (
-                        <span className="text-error text-xs" title={job.error}>
+                        <span className="text-destructive text-xs" title={job.error}>
                           Error
                         </span>
                       ) : (

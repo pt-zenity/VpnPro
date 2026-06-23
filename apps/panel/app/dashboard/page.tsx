@@ -69,7 +69,7 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight gradient-text">Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Overview of your OpenVPN infrastructure</p>
         </div>
         <div className="flex items-center gap-2">
@@ -83,7 +83,7 @@ export default function DashboardPage() {
       {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Nodes Card */}
-        <Card className="glass premium-glow overflow-hidden">
+        <Card className="bg-card overflow-hidden">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-medium">Nodes</CardTitle>
@@ -104,7 +104,7 @@ export default function DashboardPage() {
               </div>
               <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-emerald-500 to-green-400 rounded-full transition-all duration-500"
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-500"
                   style={{ width: `${nodeHealthPercentage}%` }}
                 />
               </div>
@@ -123,7 +123,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Clients Card */}
-        <Card className="glass premium-glow overflow-hidden">
+        <Card className="bg-card overflow-hidden">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-medium">Clients</CardTitle>
@@ -143,7 +143,7 @@ export default function DashboardPage() {
                 <div className="text-xs text-muted-foreground">Active</div>
               </div>
               <div className="space-y-1">
-                <div className="text-2xl font-semibold text-red-400">{stats.clients.revoked}</div>
+                <div className="text-2xl font-semibold text-destructive">{stats.clients.revoked}</div>
                 <div className="text-xs text-muted-foreground">Revoked</div>
               </div>
             </div>
@@ -159,7 +159,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Jobs Card */}
-        <Card className="glass premium-glow overflow-hidden">
+        <Card className="bg-card overflow-hidden">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base font-medium">Jobs</CardTitle>
@@ -176,7 +176,7 @@ export default function DashboardPage() {
             <div className="mt-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Running</span>
-                <Badge variant="default" className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                <Badge variant="default" className="bg-primary/20 text-primary hover:bg-primary/30 border-primary/30">
                   {stats.jobs.running}
                 </Badge>
               </div>
@@ -186,7 +186,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Failed</span>
-                <Badge variant="destructive" className="bg-red-500/20 text-red-400 border-red-500/30">
+                <Badge variant="destructive" className="bg-destructive/20 text-destructive border-destructive/30 hover:bg-destructive/30">
                   {stats.jobs.failed}
                 </Badge>
               </div>
@@ -196,7 +196,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <Card className="glass">
+      <Card className="bg-card">
         <CardHeader>
           <CardTitle className="text-lg">Quick Actions</CardTitle>
           <CardDescription>Common tasks and shortcuts</CardDescription>
@@ -205,7 +205,6 @@ export default function DashboardPage() {
           <div className="grid gap-4 md:grid-cols-3">
             <Link href="/dashboard/nodes/new">
               <Button className="w-full h-auto py-4 group relative overflow-hidden" size="lg">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <div className="relative flex items-center gap-3">
                   <Plus className="h-5 w-5" />
                   <div className="text-left">
@@ -244,11 +243,11 @@ export default function DashboardPage() {
       </Card>
 
       {/* System Status Banner */}
-      <Card className="glass bg-gradient-to-r from-blue-500/10 to-purple-600/10 border-blue-500/20">
+      <Card className="bg-card border-emerald-500/20">
         <CardContent className="py-6">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center premium-glow-sm">
-              <Shield className="h-6 w-6 text-white" />
+            <div className="h-12 w-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+              <Shield className="h-6 w-6 text-emerald-500" />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold">All Systems Operational</h3>

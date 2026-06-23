@@ -125,7 +125,7 @@ export default function NodesPage() {
           </CardContent>
         </Card>
 
-        <Card className="glass">
+        <Card className="bg-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
@@ -139,7 +139,7 @@ export default function NodesPage() {
           </CardContent>
         </Card>
 
-        <Card className="glass">
+        <Card className="bg-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
@@ -153,7 +153,7 @@ export default function NodesPage() {
           </CardContent>
         </Card>
 
-        <Card className="glass">
+        <Card className="bg-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -170,7 +170,7 @@ export default function NodesPage() {
 
       {/* Nodes Grid */}
       {nodes.length === 0 ? (
-        <Card className="glass">
+        <Card className="bg-card">
           <CardContent className="p-12 text-center">
             <div className="h-20 w-20 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-6">
               <Server className="h-10 w-10 text-muted-foreground" />
@@ -194,10 +194,10 @@ export default function NodesPage() {
             const StatusIcon = config.icon;
 
             return (
-              <Card key={node.id} className="glass group hover:shadow-lg transition-all duration-300">
+              <Card key={node.id} className="bg-card overflow-hidden hover:border-primary/50 transition-colors group">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
-                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-600/20 flex items-center justify-center">
+                    <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
                       <Server className="h-6 w-6 text-primary" />
                     </div>
                     <Badge variant={config.variant} className="gap-1.5">

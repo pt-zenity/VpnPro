@@ -113,41 +113,41 @@ export default function NodeClientsPage() {
       {loading ? (
         <div className="text-center py-12">Loading...</div>
       ) : clients.length === 0 ? (
-        <div className="bg-bg-secondary border border-border rounded-lg p-12 text-center">
-          <p className="text-gray-400 mb-4">No clients configured yet</p>
+        <div className="bg-card text-card-foreground border border-border rounded-lg p-12 text-center">
+          <p className="text-muted-foreground mb-4">No clients have been created yet.</p>
           <Link
             href={`/dashboard/nodes/${nodeId}/clients/new`}
-            className="px-4 py-2 bg-primary hover:bg-primary-600 rounded-lg"
+            className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md font-medium"
           >
             Add Your First Client
           </Link>
         </div>
       ) : (
-        <div className="bg-bg-secondary border border-border rounded-lg overflow-hidden">
+        <div className="bg-card text-card-foreground border border-border rounded-lg overflow-hidden">
           <table className="w-full">
-            <thead className="bg-bg-tertiary">
+            <thead className="bg-muted">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">
                   Created
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">
+                <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {clients.map((client) => (
-                <tr key={client.id} className="hover:bg-bg-tertiary/50">
+                <tr key={client.id} className="hover:bg-muted/50 transition-colors">
                   <td className="px-6 py-4">
                     <div>
-                      <div className="font-medium">{client.name}</div>
-                      <div className="text-xs text-gray-400 font-mono">
+                      <div className="font-medium text-foreground">{client.name}</div>
+                      <div className="text-xs text-muted-foreground font-mono">
                         {client.fingerprint.slice(0, 16)}...
                       </div>
                     </div>
@@ -155,7 +155,7 @@ export default function NodeClientsPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={statusColors[client.status]}>{client.status}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                     {new Date(client.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -170,7 +170,7 @@ export default function NodeClientsPage() {
                     {client.status === 'ACTIVE' && (
                       <button
                         onClick={() => handleRevoke(client.id, client.name)}
-                        className="text-error hover:text-error-600"
+                        className="text-destructive hover:text-destructive/80"
                       >
                         Revoke
                       </button>

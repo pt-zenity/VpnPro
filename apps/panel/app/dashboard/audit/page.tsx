@@ -53,45 +53,45 @@ export default function AuditPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Audit Logs</h2>
-        <p className="text-gray-400 mt-1">System activity history</p>
+        <p className="text-muted-foreground mt-1">System activity history</p>
       </div>
 
       {loading ? (
         <div className="text-center py-12">Loading...</div>
       ) : logs.length === 0 ? (
-        <div className="bg-bg-secondary border border-border rounded-lg p-12 text-center">
-          <p className="text-gray-400">No activity yet</p>
+        <div className="bg-card text-card-foreground border border-border rounded-lg p-12 text-center">
+          <p className="text-muted-foreground">No activity yet</p>
         </div>
       ) : (
-        <div className="bg-bg-secondary border border-border rounded-lg overflow-hidden">
+        <div className="bg-card text-card-foreground border border-border rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-bg-tertiary">
+              <thead className="bg-muted">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase whitespace-nowrap">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase whitespace-nowrap">
                     Timestamp
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase whitespace-nowrap">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase whitespace-nowrap">
                     Admin
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase whitespace-nowrap">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase whitespace-nowrap">
                     Action
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase whitespace-nowrap">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase whitespace-nowrap">
                     Node
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase whitespace-nowrap">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase whitespace-nowrap">
                     Client
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase whitespace-nowrap">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase whitespace-nowrap">
                     IP
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-bg-tertiary/50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                  <tr key={log.id} className="hover:bg-muted/50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                       {new Date(log.createdAt).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -106,7 +106,7 @@ export default function AuditPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {log.clientName || '-'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                       {log.ipAddress || '-'}
                     </td>
                   </tr>

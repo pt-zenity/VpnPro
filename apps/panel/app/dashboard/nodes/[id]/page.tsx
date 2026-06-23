@@ -28,11 +28,11 @@ interface NodeDetails {
 }
 
 const statusColors: Record<string, string> = {
-  PENDING: 'bg-gray-500',
+  PENDING: 'bg-muted-foreground',
   PROVISIONING: 'bg-blue-500',
-  HEALTHY: 'bg-green-500',
+  HEALTHY: 'bg-emerald-500',
   UNHEALTHY: 'bg-yellow-500',
-  ERROR: 'bg-red-500',
+  ERROR: 'bg-destructive',
 };
 
 const statusLabels: Record<string, string> = {
@@ -137,7 +137,7 @@ export default function NodeDetailsPage() {
   }
 
   if (!node) {
-    return <div className="text-center py-12 text-error">Node not found</div>;
+    return <div className="text-center py-12 text-destructive">Node not found</div>;
   }
 
   const canInstall = node.status === 'PENDING' || node.status === 'PROVISIONING';
@@ -156,14 +156,14 @@ export default function NodeDetailsPage() {
               {statusLabels[node.status] || node.status}
             </span>
           </div>
-          <p className="text-gray-400 mt-1">{node.host}</p>
+          <p className="text-muted-foreground mt-1">{node.host}</p>
         </div>
         <div className="flex gap-2">
           {canInstall && (
             <button
               onClick={handleInstall}
               disabled={installing}
-              className="px-4 py-2 bg-primary hover:bg-primary-600 disabled:bg-primary-50 disabled:cursor-not-allowed rounded-lg"
+              className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed rounded-md font-medium"
             >
               {installing ? 'Installing...' : 'Install OpenVPN'}
             </button>
@@ -171,7 +171,7 @@ export default function NodeDetailsPage() {
           {canAddClient && (
             <Link
               href={`/dashboard/nodes/${nodeId}/clients/new`}
-              className="px-4 py-2 bg-success hover:bg-success-600 rounded-lg"
+              className="px-4 py-2 bg-emerald-500 text-white hover:bg-emerald-600 rounded-md font-medium"
             >
               + Add Client
             </Link>
@@ -193,7 +193,7 @@ export default function NodeDetailsPage() {
       </div>
 
       {node.healthStatus && node.status === 'HEALTHY' && (
-        <div className="bg-bg-secondary border border-border rounded-lg p-6">
+        <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
           <h3 className="text-lg font-semibold mb-4">Health Status</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <MetricCard
@@ -215,31 +215,31 @@ export default function NodeDetailsPage() {
           </div>
           {node.xorMask && (
             <div className="mt-4 pt-4 border-t border-border">
-              <span className="text-sm text-gray-400">XOR Mask:</span>
+              <span className="text-sm text-muted-foreground">XOR Mask:</span>
               <code className="ml-2 text-xs">{node.xorMask}</code>
             </div>
           )}
         </div>
       )}
 
-      <div className="bg-bg-secondary border border-border rounded-lg p-6">
+      <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
         <h3 className="text-lg font-semibold mb-4">Actions</h3>
         <div className="flex flex-wrap gap-4">
           <Link
             href={`/dashboard/nodes/${nodeId}/clients`}
-            className="px-4 py-2 bg-bg-tertiary hover:bg-bg-tertiary/80 border border-border rounded-lg"
+            className="px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border rounded-md"
           >
             View Clients
           </Link>
           <Link
             href={`/dashboard/jobs?nodeId=${nodeId}`}
-            className="px-4 py-2 bg-bg-tertiary hover:bg-bg-tertiary/80 border border-border rounded-lg"
+            className="px-4 py-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border rounded-md"
           >
             View Jobs
           </Link>
           <button
             onClick={handleDelete}
-            className="px-4 py-2 bg-error hover:bg-error-600 rounded-lg"
+            className="px-4 py-2 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-md font-medium"
           >
             Delete Node
           </button>
@@ -251,8 +251,8 @@ export default function NodeDetailsPage() {
 
 function DetailCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-bg-secondary border border-border rounded-lg p-4">
-      <div className="text-sm text-gray-400">{label}</div>
+    <div className="bg-muted text-muted-foreground border border-border rounded-lg p-4">
+      <div className="text-sm text-muted-foreground">{label}</div>
       <div className="mt-1 font-medium">{value}</div>
     </div>
   );
