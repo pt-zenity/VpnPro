@@ -65,6 +65,23 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Persist per-client traffic (cumulative, reported by the agent).
+    if (input.clients && input.clients.length > 0) {
+      await Promise.all(
+        input.clients.map((c) =>
+          prisma.vpnClient.updateMany({
+            where: { nodeId, name: c.name },
+            data: {
+              bytesUp: BigInt(c.bytesUp),
+              bytesDown: BigInt(c.bytesDown),
+              online: c.online,
+              ...(c.online ? { lastSeenAt: now } : {}),
+            },
+          }),
+        ),
+      );
+    }
+
     // Get pending jobs for this node
     const pendingJobs = await prisma.job.findMany({
       where: {

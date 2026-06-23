@@ -21,10 +21,22 @@ interface Client {
   fingerprint: string;
   createdAt: string;
   revokedAt: string | null;
+  bytesUp: number;
+  bytesDown: number;
+  online: boolean;
   artifactCount: number;
 }
 
 const TH = 'px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase';
+
+/** Human-readable bytes (1024-based): 0 B, 12.3 MB, 4.7 GB … */
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes < 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  const value = bytes / Math.pow(1024, i);
+  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
 
 export default function NodeClientsPage() {
   const params = useParams();
@@ -143,6 +155,7 @@ export default function NodeClientsPage() {
                 <tr>
                   <th scope="col" className={TH}>Name</th>
                   <th scope="col" className={TH}>Status</th>
+                  <th scope="col" className={TH}>Traffic (↑ up / ↓ down)</th>
                   <th scope="col" className={TH}>Created</th>
                   <th scope="col" className={`${TH} text-right`}>Actions</th>
                 </tr>
@@ -153,13 +166,25 @@ export default function NodeClientsPage() {
                   return (
                     <tr key={client.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="font-medium text-foreground">{client.name}</div>
-                        <div className="text-xs text-muted-foreground font-mono">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`h-2 w-2 shrink-0 rounded-full ${client.online ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}
+                            title={client.online ? 'Online' : 'Offline'}
+                            aria-label={client.online ? 'Online' : 'Offline'}
+                          />
+                          <span className="font-medium text-foreground">{client.name}</span>
+                        </div>
+                        <div className="ml-4 text-xs text-muted-foreground font-mono">
                           {client.fingerprint.slice(0, 16)}…
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Badge variant={status.variant}>{status.label}</Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <span className="text-emerald-400">↑ {formatBytes(client.bytesUp)}</span>
+                        <span className="mx-1.5 text-muted-foreground">/</span>
+                        <span className="text-blue-400">↓ {formatBytes(client.bytesDown)}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
                         {new Date(client.createdAt).toLocaleDateString()}

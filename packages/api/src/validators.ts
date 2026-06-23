@@ -105,6 +105,17 @@ export const agentRegisterSchema = z.object({
 
 export type AgentRegisterInput = z.infer<typeof agentRegisterSchema>;
 
+// Per-client cumulative traffic reported by the agent. Bytes are JS numbers
+// (safe up to ~9 PB) and stored as BigInt on the panel.
+export const clientTrafficSchema = z.object({
+  name: clientNameSchema,
+  bytesUp: z.number().int().min(0),
+  bytesDown: z.number().int().min(0),
+  online: z.boolean(),
+});
+
+export type ClientTrafficInput = z.infer<typeof clientTrafficSchema>;
+
 export const agentHeartbeatSchema = z.object({
   nodeId: nodeIdSchema,
   status: z.enum(['INSTALLING', 'RUNNING', 'STOPPED', 'ERROR']),
@@ -117,6 +128,7 @@ export const agentHeartbeatSchema = z.object({
       uptime: z.number().int().min(0).optional(),
     })
     .optional(),
+  clients: z.array(clientTrafficSchema).max(5000).optional(),
 });
 
 export type AgentHeartbeatInput = z.infer<typeof agentHeartbeatSchema>;

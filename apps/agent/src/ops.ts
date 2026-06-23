@@ -1,9 +1,21 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import path from 'path';
 
 const exec = promisify(execFile);
+
+// OpenVPN status file (status-version 2) and the per-client cumulative-traffic
+// accumulator directory written by the client-disconnect hook.
+const STATUS_FILE = '/var/log/openvpn-xor-status.log';
+const TRAFFIC_DIR = '/etc/openvpn/xor/traffic';
+
+export interface ClientTraffic {
+  name: string;
+  bytesUp: number;   // client upload   (server "Bytes Received")
+  bytesDown: number; // client download (server "Bytes Sent")
+  online: boolean;
+}
 
 // Client names are interpolated into root-run shell scripts (add-user.sh /
 // revoke-user.sh) and into filesystem paths. Validate every name at every entry
@@ -362,16 +374,86 @@ export class OpenVpnOps {
   }
 
   /**
-   * Get number of connected clients from status file
+   * Read the OpenVPN status file (status-version 2). Returns '' if unavailable.
    */
-  private async getConnectedClientCount(): Promise<number> {
+  private async readStatusFile(): Promise<string> {
     try {
-      const { stdout } = await exec('cat', ['/var/log/openvpn-xor-status.log']);
-      const match = stdout.match(/n_clients=(\d+)/);
-      return match ? parseInt(match[1], 10) : 0;
+      const { stdout } = await exec('cat', [STATUS_FILE]);
+      return stdout;
     } catch {
-      return 0;
+      return '';
     }
+  }
+
+  /**
+   * Parse the current (live) session bytes per Common Name from a status-version 2
+   * file. CLIENT_LIST rows are: CLIENT_LIST,<CN>,<real>,<vaddr>,<vaddr6>,<bytesRecv>,<bytesSent>,...
+   */
+  private parseSessions(status: string): Map<string, { up: number; down: number }> {
+    const sessions = new Map<string, { up: number; down: number }>();
+    for (const line of status.split('\n')) {
+      const p = line.split(',');
+      if (p[0] === 'CLIENT_LIST' && p[1] && CLIENT_NAME_RE.test(p[1])) {
+        sessions.set(p[1], {
+          up: parseInt(p[5] || '0', 10) || 0,   // server received = client upload
+          down: parseInt(p[6] || '0', 10) || 0, // server sent     = client download
+        });
+      }
+    }
+    return sessions;
+  }
+
+  /**
+   * Read cumulative totals from completed sessions (written by client-disconnect).
+   * Each file is named after the Common Name and contains "<up> <down>".
+   */
+  private readAccumulator(): Map<string, { up: number; down: number }> {
+    const totals = new Map<string, { up: number; down: number }>();
+    try {
+      if (!existsSync(TRAFFIC_DIR)) return totals;
+      for (const name of readdirSync(TRAFFIC_DIR)) {
+        if (!CLIENT_NAME_RE.test(name)) continue;
+        try {
+          const [up, down] = readFileSync(path.join(TRAFFIC_DIR, name), 'utf-8')
+            .trim()
+            .split(/\s+/)
+            .map((n) => parseInt(n, 10) || 0);
+          totals.set(name, { up: up || 0, down: down || 0 });
+        } catch {
+          /* skip unreadable entry */
+        }
+      }
+    } catch {
+      /* traffic dir not present yet */
+    }
+    return totals;
+  }
+
+  private async getConnectedClientCount(): Promise<number> {
+    return this.parseSessions(await this.readStatusFile()).size;
+  }
+
+  /**
+   * Cumulative per-client traffic = completed-session totals (accumulator) plus
+   * the bytes of the current live session (if connected). Stable across
+   * reconnects because a disconnect moves the live bytes into the accumulator.
+   */
+  async getClientTraffic(): Promise<ClientTraffic[]> {
+    const sessions = this.parseSessions(await this.readStatusFile());
+    const totals = this.readAccumulator();
+    const names = new Set<string>([...sessions.keys(), ...totals.keys()]);
+    const result: ClientTraffic[] = [];
+    for (const name of names) {
+      const acc = totals.get(name) ?? { up: 0, down: 0 };
+      const live = sessions.get(name);
+      result.push({
+        name,
+        bytesUp: acc.up + (live?.up ?? 0),
+        bytesDown: acc.down + (live?.down ?? 0),
+        online: !!live,
+      });
+    }
+    return result;
   }
 
   /**

@@ -93,6 +93,14 @@ export class Agent {
       const status = await this.ops.getStatus();
       const details = await this.ops.getDetails();
 
+      // Per-client cumulative traffic (best-effort — never fail the heartbeat over it).
+      let clients;
+      try {
+        clients = await this.ops.getClientTraffic();
+      } catch {
+        clients = undefined;
+      }
+
       // Send heartbeat to panel
       const response = await this.api.post('/api/agent/heartbeat', {
         timestamp: startTime,
@@ -105,6 +113,7 @@ export class Agent {
           disk: details.disk || 0,
           uptime: details.uptime || 0,
         },
+        ...(clients && clients.length > 0 ? { clients } : {}),
       });
 
       // Any successful heartbeat clears the consecutive-auth-failure counter.

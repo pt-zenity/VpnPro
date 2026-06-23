@@ -282,11 +282,37 @@ push "dhcp-option DNS 8.8.8.8"
 scramble xormask $XOR_MASK
 
 verb 3
-status /var/log/openvpn-xor-status.log
+status /var/log/openvpn-xor-status.log 10
+status-version 2
 log-append /var/log/openvpn-xor.log
+
+# Per-client cumulative traffic accounting.
+script-security 2
+client-disconnect $OVPN_DIR/client-disconnect.sh
 
 explicit-exit-notify 1
 EOF
+
+echo "=== Install per-client traffic accounting hook ==="
+mkdir -p "$OVPN_DIR/traffic"
+cat > "$OVPN_DIR/client-disconnect.sh" <<'DISCONNECT'
+#!/usr/bin/env bash
+# OpenVPN calls this on client disconnect with $common_name / $bytes_received /
+# $bytes_sent (the session totals). We add them into a per-client file so the
+# agent can report cumulative lifetime traffic to the panel.
+set -eu
+DIR=/etc/openvpn/xor/traffic
+cn="${common_name:-}"
+# Only accept validated client names (also makes the filename safe).
+case "$cn" in *[!a-zA-Z0-9._-]*|'') exit 0 ;; esac
+mkdir -p "$DIR"
+f="$DIR/$cn"
+up=0; down=0
+if [ -f "$f" ]; then read -r up down < "$f" 2>/dev/null || { up=0; down=0; }; fi
+echo "$(( ${up:-0} + ${bytes_received:-0} )) $(( ${down:-0} + ${bytes_sent:-0} ))" > "$f"
+exit 0
+DISCONNECT
+chmod +x "$OVPN_DIR/client-disconnect.sh"
 
 echo "=== Enable IPv4 forwarding ==="
 

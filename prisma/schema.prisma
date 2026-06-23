@@ -107,6 +107,12 @@ model VpnClient {
   expiresAt  DateTime?
   lastSeenAt DateTime?
 
+  // Cumulative traffic, reported by the node agent.
+  // bytesUp = client upload (server received), bytesDown = client download (server sent).
+  bytesUp   BigInt  @default(0)
+  bytesDown BigInt  @default(0)
+  online    Boolean @default(false)
+
   artifacts ClientArtifact[]
   auditLogs AuditLog[]
 

@@ -2,6 +2,7 @@
   "name": "ovpn-admin",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "pnpm@11.8.0",
   "scripts": {
     "dev": "concurrently \"pnpm --filter @ovpn/panel dev\" \"pnpm --filter @ovpn/worker dev\"",
     "build": "pnpm -r build",
