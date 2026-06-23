@@ -60,6 +60,10 @@ export default function NodeDetailsPage() {
   const [migrateToken, setMigrateToken] = useState('');
   const [installProgress, setInstallProgress] = useState(0);
   const [installMessage, setInstallMessage] = useState('');
+  // True only while an actual NODE_INSTALL job is pending/running, so a freshly
+  // attached node (PROVISIONING but no install yet) doesn't show a misleading
+  // "Installing 0%" bar.
+  const [installActive, setInstallActive] = useState(false);
   const [origin, setOrigin] = useState('');
 
   useEffect(() => {
@@ -150,6 +154,7 @@ export default function NodeDetailsPage() {
         if (cancelled) return;
         setInstallProgress(data.progress ?? 0);
         setInstallMessage(data.message ?? '');
+        setInstallActive(data.status === 'PENDING' || data.status === 'RUNNING');
         if (data.status && data.status !== 'PENDING') {
           loadNode(controller.signal, true);
         }
@@ -238,7 +243,16 @@ export default function NodeDetailsPage() {
 
   const status = getNodeStatus(node.status);
   const StatusIcon = status.icon;
-  const canInstall = node.status === 'PENDING' || node.status === 'PROVISIONING';
+  // Show the install action whenever the agent is connected but OpenVPN isn't
+  // installed yet — including recovery from a transient ERROR/UNHEALTHY before
+  // the first successful install. Once installed (HEALTHY / installedAt set),
+  // hide it; re-provisioning is a separate flow.
+  const isInstalled = node.status === 'HEALTHY' || !!node.installedAt;
+  const agentConnected =
+    !!node.lastHeartbeatAt && Date.now() - new Date(node.lastHeartbeatAt).getTime() < 5 * 60 * 1000;
+  const canInstall = !isInstalled;
+  // A node that's connected and not installed, with no install running yet.
+  const awaitingInstall = !isInstalled && !installActive;
   const canAddClient = node.status === 'HEALTHY';
 
   return (
@@ -308,7 +322,7 @@ export default function NodeDetailsPage() {
         </div>
       </div>
 
-      {node.status === 'PROVISIONING' && (
+      {installActive && (
         <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-semibold text-lg">Installing OpenVPN</h3>
@@ -324,6 +338,19 @@ export default function NodeDetailsPage() {
           >
             <div className="bg-primary h-3 rounded-full transition-all duration-500 ease-out" style={{ width: `${installProgress}%` }} />
           </div>
+        </div>
+      )}
+
+      {awaitingInstall && (
+        <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
+          <h3 className="font-semibold text-lg mb-1">
+            {agentConnected ? 'Agent connected — ready to install' : 'Waiting for the agent to connect…'}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {agentConnected
+              ? 'The node is registered and its agent is online. Click “Install OpenVPN” to provision OpenVPN with your chosen options (XOR / DNS / domain / MTU).'
+              : 'Run the install command on the server. Once the agent checks in, you can install OpenVPN here.'}
+          </p>
         </div>
       )}
 

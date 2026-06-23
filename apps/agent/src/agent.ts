@@ -105,7 +105,9 @@ export class Agent {
       const response = await this.api.post('/api/agent/heartbeat', {
         timestamp: startTime,
         uptime: Math.floor(process.uptime()),
-        status: status.openvpn === 'RUNNING' ? 'RUNNING' : 'ERROR',
+        // Report the real OpenVPN state. NOT_INSTALLED is the normal pre-install
+        // state and must not be conflated with a failure.
+        status: status.openvpn,
         details: {
           connectedClients: status.connectedClients || 0,
           cpu: details.cpu || 0,

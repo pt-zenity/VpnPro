@@ -37,7 +37,7 @@ const OVPN_BIN = existsSync('/usr/local/sbin/openvpn-xor')
   : '/usr/local/sbin/openvpn';
 
 export interface OpenVpnStatus {
-  openvpn: 'RUNNING' | 'STOPPED' | 'ERROR';
+  openvpn: 'RUNNING' | 'STOPPED' | 'NOT_INSTALLED' | 'ERROR';
   version?: string;
   xorMask?: string;
   connectedClients: number;
@@ -69,14 +69,20 @@ export class OpenVpnOps {
    * Get OpenVPN service status
    */
   async getStatus(): Promise<OpenVpnStatus> {
+    // Distinguish three very different situations so the panel reacts correctly:
+    //   • NOT_INSTALLED — a freshly-registered node whose OpenVPN hasn't been
+    //     installed yet. This is the normal pre-install state and must NOT be
+    //     reported as an error (otherwise the panel flips the node to ERROR and
+    //     hides the "Install OpenVPN" action, leaving the operator stuck).
+    //   • STOPPED       — OpenVPN is installed but the service isn't active.
+    //   • RUNNING       — installed and active.
+    // Only a genuine, unexpected failure falls through to ERROR.
     try {
-      // Check systemd status
-      const { stdout: systemctlOutput } = await exec('systemctl', ['is-active', 'openvpn-xor']);
-      const isActive = systemctlOutput.trim() === 'active';
-
-      if (!isActive) {
+      // No binary/config/PKI yet → nothing has been installed on this node.
+      const install = await this.checkInstallation();
+      if (!install.installed) {
         return {
-          openvpn: 'STOPPED',
+          openvpn: 'NOT_INSTALLED',
           connectedClients: 0,
           uptime: 0,
           port: 443,
@@ -84,33 +90,35 @@ export class OpenVpnOps {
         };
       }
 
-      // Get OpenVPN version. Report 'unknown' rather than a fabricated default
-      // when the real version can't be read.
-      let version = 'unknown';
+      // `systemctl is-active` exits non-zero for any non-active unit, which makes
+      // execFile reject. Read the state from the rejection's stdout too, so a
+      // stopped/failed unit is reported as STOPPED instead of collapsing to ERROR.
+      let active = '';
       try {
-        const { stdout: versionOutput } = await exec(OVPN_BIN, ['--version']);
-        const versionMatch = versionOutput.match(/OpenVPN (\d+\.\d+\.\d+)/);
-        if (versionMatch?.[1]) {
-          version = versionMatch[1];
-        }
-      } catch (e) {
-        // Real version unavailable; leave as 'unknown'.
+        const { stdout } = await exec('systemctl', ['is-active', 'openvpn-xor']);
+        active = stdout.trim();
+      } catch (err: any) {
+        active = String(err?.stdout ?? '').trim();
       }
 
-      // Get XOR mask from config
-      let xorMask = '';
-      try {
-        const { stdout: configOutput } = await exec('cat', [`${OVPN_DIR}/server.conf`]);
-        const xorMatch = configOutput.match(/scramble xormask (\S+)/);
-        xorMask = xorMatch?.[1] || '';
-      } catch (e) {
-        xorMask = '';
+      if (active !== 'active') {
+        return {
+          openvpn: 'STOPPED',
+          version: install.version,
+          xorMask: install.xorMask,
+          connectedClients: 0,
+          uptime: 0,
+          port: 443,
+          protocol: 'udp',
+        };
       }
 
-      // Get connected clients from status file
+      // Running: reuse the version/XOR mask already read by checkInstallation,
+      // and gather live connection/uptime details.
+      const version = install.version ?? 'unknown';
+      const xorMask = install.xorMask ?? '';
       const connectedClients = await this.getConnectedClientCount();
 
-      // Get uptime
       let uptime = 0;
       try {
         const { stdout: uptimeOutput } = await exec('systemctl', ['show', 'openvpn-xor', '--property=ExecMainStartTimestamp', '--value']);

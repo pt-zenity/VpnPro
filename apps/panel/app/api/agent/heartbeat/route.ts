@@ -24,13 +24,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine new status
+    // Determine new node status from the agent-reported OpenVPN state.
+    //   RUNNING        → HEALTHY
+    //   NOT_INSTALLED  → agent is alive but OpenVPN isn't installed yet. Keep the
+    //                    node in the provisioning lane so the operator can trigger
+    //                    the install — never flip it to ERROR. Don't downgrade a
+    //                    node that has already been installed/healthy.
+    //   STOPPED        → installed but the service is down → UNHEALTHY (recoverable)
+    //   ERROR          → a genuine agent/host failure
+    //   INSTALLING     → install in progress
     let newStatus = node.status;
     if (input.status === 'RUNNING') {
       newStatus = 'HEALTHY';
+    } else if (input.status === 'NOT_INSTALLED') {
+      // OpenVPN genuinely isn't installed yet (agent is healthy). Park the node
+      // in the provisioning lane and recover it from any earlier transient
+      // ERROR/UNHEALTHY. Only an already-HEALTHY node is left untouched.
+      if (node.status !== 'HEALTHY') {
+        newStatus = 'PROVISIONING';
+      }
+    } else if (input.status === 'STOPPED') {
+      newStatus = 'UNHEALTHY';
     } else if (input.status === 'ERROR') {
       newStatus = 'ERROR';
-    } else if (node.status === 'PENDING') {
+    } else if (input.status === 'INSTALLING') {
       newStatus = 'PROVISIONING';
     }
 
@@ -45,25 +62,28 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Store health check. Derive health from the agent-reported status and
-    // resource pressure rather than always recording HEALTHY.
-    const cpu = input.details?.cpu ?? 0;
-    const disk = input.details?.disk ?? 0;
-    const healthStatus =
-      input.status === 'ERROR' || input.status === 'STOPPED'
-        ? 'DOWN'
-        : cpu >= 95 || disk >= 95
-          ? 'DEGRADED'
-          : 'HEALTHY';
+    // Store a health check — but only once OpenVPN is actually installed. A
+    // not-yet-installed node has no service to be "down", so recording DOWN for
+    // it would make a perfectly healthy, freshly-attached node look broken.
+    if (input.status !== 'NOT_INSTALLED') {
+      const cpu = input.details?.cpu ?? 0;
+      const disk = input.details?.disk ?? 0;
+      const healthStatus =
+        input.status === 'ERROR' || input.status === 'STOPPED'
+          ? 'DOWN'
+          : cpu >= 95 || disk >= 95
+            ? 'DEGRADED'
+            : 'HEALTHY';
 
-    await prisma.healthCheck.create({
-      data: {
-        nodeId,
-        status: healthStatus,
-        details: input.details ?? {},
-        checkedAt: now,
-      },
-    });
+      await prisma.healthCheck.create({
+        data: {
+          nodeId,
+          status: healthStatus,
+          details: input.details ?? {},
+          checkedAt: now,
+        },
+      });
+    }
 
     // Persist per-client traffic (cumulative, reported by the agent).
     if (input.clients && input.clients.length > 0) {

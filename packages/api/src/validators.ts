@@ -118,7 +118,7 @@ export type ClientTrafficInput = z.infer<typeof clientTrafficSchema>;
 
 export const agentHeartbeatSchema = z.object({
   nodeId: nodeIdSchema,
-  status: z.enum(['INSTALLING', 'RUNNING', 'STOPPED', 'ERROR']),
+  status: z.enum(['INSTALLING', 'NOT_INSTALLED', 'RUNNING', 'STOPPED', 'ERROR']),
   details: z
     .object({
       connectedClients: z.number().int().min(0).optional(),
