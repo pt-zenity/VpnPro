@@ -364,9 +364,11 @@ cp pki/private/server.key "$OVPN_DIR/"
 if [ "$XOR_SUPPORT" -eq 1 ]; then
     XOR_MASK=$(openssl rand -hex 8)
     echo "$XOR_MASK" > "$OVPN_DIR/xormask.txt"
+    SERVER_XOR_LINE="scramble xormask ${XOR_MASK}"
 else
     XOR_MASK=""
     echo "disabled" > "$OVPN_DIR/xormask.txt"
+    SERVER_XOR_LINE=""
 fi
 
 # Determine correct unprivileged group
@@ -407,7 +409,7 @@ persist-tun
 status /var/log/openvpn-xor-status.log
 verb 3
 
-${XOR_LINE}
+${SERVER_XOR_LINE}
 EOF
 
 if [ "$XOR_SUPPORT" -eq 1 ] && [ -n "$XOR_MASK" ]; then
