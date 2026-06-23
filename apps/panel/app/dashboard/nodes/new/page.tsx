@@ -71,16 +71,16 @@ export default function NewNodePage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold gradient-text">Node Created Successfully</h1>
+            <h1 className="text-3xl font-bold text-foreground">Node Created Successfully</h1>
             <p className="text-muted-foreground mt-1">Install the agent on your VPN server</p>
           </div>
         </div>
 
         {/* Success Banner */}
-        <Card className="glass bg-gradient-to-r from-emerald-500/10 to-green-600/10 border-emerald-500/20">
+        <Card className="glass bg-emerald-500/10 border-emerald-500/20">
           <CardContent className="py-6">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center">
                 <Check className="h-6 w-6 text-white" />
               </div>
               <div className="flex-1">
@@ -218,7 +218,7 @@ export default function NewNodePage() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold gradient-text">Add New Node</h1>
+          <h1 className="text-3xl font-bold text-foreground">Add New Node</h1>
           <p className="text-muted-foreground mt-1">Register a VPN node with the panel</p>
         </div>
       </div>
@@ -289,8 +289,7 @@ export default function NewNodePage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading} className="gap-2 group relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <Button type="submit" disabled={loading} className="gap-2 group relative overflow-hidden bg-primary hover:bg-primary/90 text-primary-foreground">
                 <span className="relative flex items-center gap-2">
                   {loading ? (
                     <>

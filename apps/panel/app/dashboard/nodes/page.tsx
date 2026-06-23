@@ -95,12 +95,11 @@ export default function NodesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight gradient-text">Nodes</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Nodes</h1>
           <p className="text-muted-foreground mt-1">Manage your VPN infrastructure</p>
         </div>
         <Link href="/dashboard/nodes/new">
-          <Button size="lg" className="gap-2 group relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <Button size="lg" className="gap-2 group relative overflow-hidden bg-primary hover:bg-primary/90 text-primary-foreground">
             <span className="relative flex items-center gap-2">
               <Plus className="h-5 w-5" />
               Add Node

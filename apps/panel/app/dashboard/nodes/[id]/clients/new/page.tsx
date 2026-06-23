@@ -74,7 +74,7 @@ export default function NewClientPage() {
   }, [polling, jobId, nodeId, router]);
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="w-full max-w-4xl space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Add New Client</h2>
         <p className="text-gray-400 mt-1">Create a VPN client configuration</p>
@@ -87,13 +87,13 @@ export default function NewClientPage() {
       )}
 
       {polling ? (
-        <div className="bg-card text-card-foreground border border-border rounded-lg p-8 text-center">
+        <div className="w-full bg-card text-card-foreground border border-border rounded-lg p-16 text-center">
           <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4" />
           <p className="text-gray-400 mb-2">Creating client configuration...</p>
           <p className="text-sm text-gray-500">Status: {jobStatus}</p>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="bg-card text-card-foreground border border-border rounded-lg p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-card text-card-foreground border border-border rounded-lg p-6 space-y-4 max-w-2xl">
           <div>
             <label htmlFor="name" className="block text-sm font-medium mb-2">
               Client Name

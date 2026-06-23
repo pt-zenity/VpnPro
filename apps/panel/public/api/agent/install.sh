@@ -540,6 +540,9 @@ remote-cert-tls server
 data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
 data-ciphers-fallback AES-256-GCM
 auth SHA256
+redirect-gateway def1 bypass-dhcp
+dhcp-option DNS 8.8.8.8
+dhcp-option DNS 1.1.1.1
 ${XOR_LINE}
 verb 3
 <ca>
@@ -769,6 +772,7 @@ EOFINDEX
 cat > index.js << 'EOFINDEX'
 import axios from 'axios';
 import { readFileSync } from 'fs';
+import os from 'os';
 
 let API_TOKEN = readFileSync('/opt/ovpn-agent/.api_token', 'utf-8').trim();
 const PANEL_URL = process.env.PANEL_URL;
@@ -846,17 +850,25 @@ async function sendHeartbeat() {
   try {
     const vpnStatus = await getOpenVPNStatus();
 
+    const uptime = os.uptime();
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const memoryUsed = ((totalMem - freeMem) / totalMem) * 100;
+    const cpuCount = os.cpus().length;
+    const cpuPercent = (os.loadavg()[0] / cpuCount) * 100;
+
     const response = await axios.post(
       `${PANEL_URL}/api/agent/heartbeat`,
       {
         timestamp: startTime,
-        uptime: Math.floor(process.uptime()),
+        uptime: Math.floor(uptime),
         status: vpnStatus.status,
         details: {
           connectedClients: vpnStatus.connectedClients,
-          cpu: 0,
-          memory: 0,
+          cpu: cpuPercent,
+          memory: memoryUsed,
           disk: 0,
+          uptime: Math.floor(uptime),
         }
       },
       {
