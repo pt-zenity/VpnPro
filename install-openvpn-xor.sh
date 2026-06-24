@@ -897,7 +897,14 @@ fi
 echo "PROGRESS:98:Creating first client"
 echo "=== Create first user ==="
 
-"$ADMIN_DIR/add-user.sh" "$FIRST_USER"
+# Idempotent: on a reinstall or migration the PKI (and this first client) may
+# already exist. add-user.sh exits non-zero in that case, which would fail the
+# whole install under `set -e` — so skip creation when the cert already exists.
+if [[ -f "$EASYRSA_DIR/pki/issued/$FIRST_USER.crt" ]]; then
+  echo "First client '$FIRST_USER' already exists — skipping"
+else
+  "$ADMIN_DIR/add-user.sh" "$FIRST_USER"
+fi
 
 echo
 echo "=== Installation complete ==="
