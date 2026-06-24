@@ -54,6 +54,9 @@ echo "Panel URL: $PANEL_URL"
 echo "Admin:     $ADMIN_EMAIL"
 
 export DEBIAN_FRONTEND=noninteractive
+# Don't let needrestart auto-restart services (e.g. docker) mid-install.
+export NEEDRESTART_SUSPEND=1
+export NEEDRESTART_MODE=l
 # Prefer IPv4 when IPv6 egress is broken (common on VPS).
 if ! curl -6 -sf --max-time 5 https://github.com >/dev/null 2>&1 \
    && curl -4 -sf --max-time 5 https://github.com >/dev/null 2>&1; then

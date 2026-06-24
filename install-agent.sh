@@ -41,7 +41,11 @@ if ! curl -6 -sf --max-time 5 https://github.com >/dev/null 2>&1 \
 fi
 
 # 2) Toolchain: install the requested Node major (24 LTS by default) + git.
+# Suspend needrestart so apt never auto-restarts services (including a
+# previously-installed ovpn-agent) out from under this script during a re-install.
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_SUSPEND=1
+export NEEDRESTART_MODE=l
 if ! { command -v node >/dev/null 2>&1 && [[ "$(node -v)" == v${NODE_MAJOR}.* ]]; }; then
   echo "Installing Node.js ${NODE_MAJOR} (LTS)..."
   curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash - >/dev/null 2>&1

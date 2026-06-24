@@ -318,8 +318,19 @@ systemctl reset-failed openvpn-xor 2>/dev/null || true
 
 echo "=== Install dependencies ==="
 
+# CRITICAL: this installer runs as a child of the ovpn-agent systemd service.
+# Ubuntu's `needrestart` hook runs after apt upgrades shared libraries (libssl,
+# openssl, …) and, in automatic mode, restarts every affected daemon — INCLUDING
+# ovpn-agent. Restarting the agent SIGTERMs it, which kills this very script
+# mid-compile and fails the install. Fully suspend needrestart (and keep apt
+# non-interactive) for every apt call below so provisioning never bounces the
+# agent or unrelated services.
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_SUSPEND=1
+export NEEDRESTART_MODE=l
+
 apt update
-DEBIAN_FRONTEND=noninteractive apt install -y \
+apt install -y \
   git curl wget ca-certificates \
   build-essential autoconf automake libtool pkg-config patch \
   libssl-dev liblzo2-dev liblz4-dev libpam0g-dev libcap-ng-dev \
