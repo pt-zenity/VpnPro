@@ -186,13 +186,16 @@ keepalive 10 120
 tun-mtu $MTU
 mssfix $MSSFIX
 EOF
+    # NB: these are `if/fi`, not `[[ … ]] && echo`. Under `set -e`, a trailing
+    # `[[ false ]] && echo` returns 1 and would abort the whole script (this is
+    # exactly what broke TCP/split reconfigures). `if/fi` always returns 0.
     # Full tunnel = push a default route; split tunnel = only the VPN subnet.
-    [[ "$TUNNEL_MODE" == "split" ]] || echo 'push "redirect-gateway def1 bypass-dhcp"'
+    if [[ "$TUNNEL_MODE" != "split" ]]; then echo 'push "redirect-gateway def1 bypass-dhcp"'; fi
     render_dns_pushes
-    [[ "$CLIENT_TO_CLIENT" == "1" ]] && echo "client-to-client"
-    [[ "$DUPLICATE_CN" == "1" ]] && echo "duplicate-cn"
+    if [[ "$CLIENT_TO_CLIENT" == "1" ]]; then echo "client-to-client"; fi
+    if [[ "$DUPLICATE_CN" == "1" ]]; then echo "duplicate-cn"; fi
     local scramble; scramble="$(render_scramble_line)"
-    [[ -n "$scramble" ]] && echo "$scramble"
+    if [[ -n "$scramble" ]]; then echo "$scramble"; fi
     cat <<EOF
 
 verb 3
@@ -204,7 +207,7 @@ script-security 2
 client-disconnect $OVPN_DIR/client-disconnect.sh
 EOF
     # explicit-exit-notify is UDP-only; it errors the parser on TCP.
-    [[ "$PROTO" == "udp" ]] && echo "explicit-exit-notify 1"
+    if [[ "$PROTO" == "udp" ]]; then echo "explicit-exit-notify 1"; fi
   } > "$OVPN_DIR/server.conf"
 }
 

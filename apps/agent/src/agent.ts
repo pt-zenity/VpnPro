@@ -220,14 +220,23 @@ export class Agent {
 
         case 'NODE_INSTALL':
         case 'node-install':
-          // Seamless migration: if the panel has a PKI backup for this node,
-          // restore it BEFORE installing so the new server keeps the same CA,
-          // client certs, CRL and XOR mask (existing .ovpn files keep working).
+          // Seamless migration: if the panel has a PKI backup, restore it BEFORE
+          // installing so the new server keeps the same CA/certs/CRL/XOR mask.
+          // CRITICAL: only restore when this host has NO local PKI (a genuine
+          // migration to a fresh server). On a reconfigure of an already-
+          // installed node the local PKI is authoritative — restoring the
+          // (possibly older) backup would clobber current config and could drop
+          // very-recently-added clients.
           if (job.payload?.restore) {
-            const backup = await this.downloadBackup();
-            if (backup) {
-              await this.ops.restorePki(backup);
-              console.log('  ↺ Restored PKI from panel backup');
+            const info = await this.ops.checkInstallation();
+            if (!info.pkiExists) {
+              const backup = await this.downloadBackup();
+              if (backup) {
+                await this.ops.restorePki(backup);
+                console.log('  ↺ Restored PKI from panel backup');
+              }
+            } else {
+              console.log('  (local PKI present — reconfigure, skipping restore)');
             }
           }
           // Idempotent: fast reconfigure if already installed, full build on a
