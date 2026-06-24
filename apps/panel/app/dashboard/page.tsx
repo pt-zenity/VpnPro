@@ -158,7 +158,7 @@ export default function DashboardPage() {
             <div className="mt-4">
               <Button asChild variant="ghost" size="sm" className="w-full justify-between">
                 <Link href="/dashboard/nodes">
-                  Manage Clients
+                  Manage via Nodes
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { listAuditLogsSchema } from '@ovpn/api';
 import { withAuth } from '@/lib/middleware';
+import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 
 // GET /api/audit-logs - List audit logs
 export const GET = withAuth(async (request: NextRequest, payload) => {
@@ -58,12 +59,7 @@ export const GET = withAuth(async (request: NextRequest, payload) => {
       total,
     });
   } catch (error) {
-    if (error instanceof Error && 'name' in error && error.name === 'ZodError') {
-      return NextResponse.json(
-        { error: 'INVALID_INPUT', issues: error },
-        { status: 400 },
-      );
-    }
+    if (isZodError(error)) return zodErrorResponse(error);
     console.error('List audit logs error:', error);
     return NextResponse.json(
       { error: 'INTERNAL_ERROR', message: 'Failed to list audit logs' },

@@ -63,27 +63,24 @@ Every node installed will have:
 
 ## 🚀 Deployment
 
-### On Panel Server (185.226.93.222)
+### Panel server (one command)
 
 ```bash
-cd /root/ovpn
-./deploy.sh
+curl -fsSL https://raw.githubusercontent.com/tunnect-spec/ovpn-admin/main/quick-install.sh | sudo bash
 ```
 
-Or manually:
-```bash
-git pull origin main
-pnpm install
-pnpm build:panel
-pm2 restart ovpn-panel
-```
+This installs Docker, builds the images, and brings up postgres + redis + panel +
+worker via Docker Compose. To update an existing install, re-run the same command.
 
-### On VPN Node (91.107.154.238)
+### Add a VPN node
+
+Create the node in the panel (Nodes → Add Node), then run the install command it
+shows on your server (as root). It looks like:
 
 ```bash
-curl -fsSL https://therockybalbo.xyz/api/agent/install.sh | \
+curl -fsSL <PANEL_URL>/api/agent/install.sh | \
   AGENT_TOKEN=<token_from_panel> \
-  PANEL_URL=https://therockybalbo.xyz \
+  PANEL_URL=<PANEL_URL> \
   bash
 ```
 

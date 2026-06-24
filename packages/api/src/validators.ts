@@ -184,7 +184,17 @@ export type AgentRevokeClientInput = z.infer<typeof agentRevokeClientSchema>;
 
 export const listJobsSchema = z.object({
   nodeId: nodeIdSchema.optional(),
-  type: z.enum(['NODE_INSTALL', 'CLIENT_CREATE', 'CLIENT_REVOKE', 'NODE_SYNC', 'HEALTH_CHECK']).optional(),
+  type: z
+    .enum([
+      'NODE_INSTALL',
+      'CLIENT_CREATE',
+      'CLIENT_REVOKE',
+      'CLIENT_DISABLE',
+      'CLIENT_ENABLE',
+      'NODE_SYNC',
+      'HEALTH_CHECK',
+    ])
+    .optional(),
   status: z.enum(['PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED']).optional(),
   page: z.coerce.number().int().min(1).optional().default(1),
   limit: z.coerce.number().int().min(1).max(100).optional().default(20),

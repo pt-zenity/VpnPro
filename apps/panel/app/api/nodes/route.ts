@@ -12,11 +12,15 @@ async function GET_handler(request: NextRequest, payload: any) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20') || 20));
     const skip = (page - 1) * limit;
 
-    const where = status ? { status: status as NodeStatus } : {};
+    // Only filter by status when it's a valid NodeStatus — a bogus value must
+    // not reach Prisma (which would throw → 500). Unknown values are ignored.
+    const VALID_STATUSES = ['PENDING', 'PROVISIONING', 'HEALTHY', 'UNHEALTHY', 'ERROR'];
+    const where =
+      status && VALID_STATUSES.includes(status) ? { status: status as NodeStatus } : {};
 
     const [nodes, total] = await Promise.all([
       prisma.node.findMany({
@@ -30,6 +34,7 @@ async function GET_handler(request: NextRequest, payload: any) {
           host: true,
           status: true,
           version: true,
+          openvpnVersion: true,
           lastHeartbeatAt: true,
           createdAt: true,
           healthChecks: {

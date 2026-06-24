@@ -173,16 +173,20 @@ docker compose -f docker/compose.yml up -d
 
 # Database
 pnpm db:push
-pnpm db:seed
+SEED_ADMIN_EMAIL=you@example.com SEED_ADMIN_PASSWORD='a-strong-password' pnpm db:seed
 
 # Run
 pnpm dev
 ```
 
+> Production install is a single command — see SETUP.md / README.md
+> (`curl -fsSL .../quick-install.sh | sudo bash`).
+
 ## Credentials
 
-- Email: `admin@example.com`
-- Password: `admin123`
+The admin login is set at seed time via `SEED_ADMIN_EMAIL` (defaults to
+`admin@example.com`) and `SEED_ADMIN_PASSWORD` (no default — required in
+production). There is no hardcoded default password.
 
 ## What Works
 

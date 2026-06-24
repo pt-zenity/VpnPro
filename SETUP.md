@@ -4,81 +4,74 @@ Complete setup instructions for the self-hosted OpenVPN admin panel.
 
 ## Prerequisites
 
-- **Node.js** 20+
-- **pnpm** 9+
-- **Docker** & Docker Compose
-- **VPN Server** with Ubuntu 22.04/24.04
+- **Docker** & Docker Compose (production)
+- **Node.js** 24 + **pnpm** 9+ (local development only)
+- **VPN node**: a server running Ubuntu 22.04/24.04 with root access
 
-## Quick Start
+## Production install (recommended)
 
-### 1. Clone & Install
+One command on a fresh Ubuntu server installs Docker and brings up the whole
+stack (postgres + redis + panel + worker) via Docker Compose:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/tunnect-spec/ovpn-admin/main/quick-install.sh | sudo bash
+```
+
+It prompts for the admin email/password (or generates one) and prints the panel
+URL when done. Re-run the same command to update an existing install. Front the
+panel with TLS (a domain + reverse proxy) for production.
+
+## Local development
+
+### 1. Clone & install
+
+```bash
+git clone https://github.com/tunnect-spec/ovpn-admin.git
 cd ovpn-admin
 pnpm install
 ```
 
-### 2. Configure Environment
+### 2. Configure environment
 
 ```bash
-cp .env.example .env
-# Edit .env with your settings
+cp .env.example .env   # then fill in the secrets (see comments in the file)
 ```
 
-Required variables:
-```bash
-DATABASE_URL="postgresql://ovpn:yourpassword@localhost:5432/ovpn_admin"
-REDIS_URL="redis://localhost:6379"
-JWT_SECRET="your-secret-key-min-32-chars"
-```
-
-### 3. Start Services
+### 3. Start datastores, apply schema, seed an admin
 
 ```bash
-# Start PostgreSQL and Redis
-docker compose -f docker/compose.yml up -d
+# Bring up postgres + redis (uncomment the postgres `ports` block in
+# docker/compose.yml first so the host can reach it on 127.0.0.1:5432).
+docker compose -f docker/compose.yml up -d postgres redis
 
-# Run database migrations
-pnpm db:push
-
-# Seed initial admin
-pnpm db:seed
+pnpm db:push                                            # apply the schema
+SEED_ADMIN_EMAIL=you@example.com SEED_ADMIN_PASSWORD='a-strong-password' pnpm db:seed
 ```
 
-Default admin credentials:
-- Email: `admin@example.com`
-- Password: `admin123`
+The admin login is whatever you pass in `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
+(email defaults to `admin@example.com`; the password has no default — in
+production a missing `SEED_ADMIN_PASSWORD` is a hard error).
 
-**IMPORTANT:** Change password after first login!
-
-### 4. Start Panel
+### 4. Start the panel + worker
 
 ```bash
 pnpm dev
 ```
 
-Panel will be available at http://localhost:3000
+Panel will be available at http://localhost:3000.
 
-### 5. Add Your First Node
+### 5. Add your first node
 
-1. Login to panel
-2. Go to Nodes → Add Node
-3. Enter name and host
-4. Copy install command
-5. Run on VPN server
-
-### 6. Install Agent on VPN Server
+1. Log in to the panel.
+2. Go to Nodes → Add Node, enter a name and host.
+3. Copy the install command it shows and run it on your VPN server as root:
 
 ```bash
-# SSH into your VPN server as root
-ssh root@your-vpn-server
-
-# Run the install command (from panel)
-curl -fsSL https://your-panel.com/install-agent.sh | \
-  AGENT_TOKEN=<token> PANEL_URL=https://your-panel.com bash
+curl -fsSL <PANEL_URL>/api/agent/install.sh | \
+  AGENT_TOKEN=<token_from_panel> PANEL_URL=<PANEL_URL> bash
 ```
 
-### 7. Install OpenVPN (Optional)
+### 6. Install OpenVPN
 
 If the node doesn't have OpenVPN installed:
 
@@ -154,8 +147,8 @@ systemctl status ovpn-agent
 # View agent logs
 journalctl -u ovpn-agent -f
 
-# Test panel connectivity
-curl -v https://your-panel.com/api/agent/status
+# Test panel connectivity (the installer endpoint is public)
+curl -v <PANEL_URL>/api/agent/install.sh
 ```
 
 ### OpenVPN won't start

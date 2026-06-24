@@ -23,9 +23,11 @@ export const GET = withAuth(async (request: NextRequest, payload, { params }: { 
       );
     }
 
+    // Ignore an invalid status filter rather than passing it to Prisma (→ 500).
+    const VALID_CLIENT_STATUSES = ['ACTIVE', 'DISABLED', 'REVOKED', 'EXPIRED'];
     const where = {
       nodeId,
-      ...(status ? { status: status as ClientStatus } : {}),
+      ...(status && VALID_CLIENT_STATUSES.includes(status) ? { status: status as ClientStatus } : {}),
     };
 
     const clients = await prisma.vpnClient.findMany({

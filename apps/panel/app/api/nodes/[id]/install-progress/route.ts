@@ -1,27 +1,18 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@ovpn/db';
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { withAuth } from '@/lib/middleware';
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+type Params = Promise<{ id: string }>;
+
+// GET /api/nodes/:id/install-progress — latest NODE_INSTALL job progress (auth-gated).
+export const GET = withAuth(async (_request: NextRequest, _payload, { params }: { params: Params }) => {
   try {
     const { id } = await params;
 
-    // Get the latest NODE_INSTALL job for this node
     const job = await prisma.job.findFirst({
-      where: {
-        nodeId: id,
-        type: 'NODE_INSTALL',
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      select: {
-        status: true,
-        progress: true,
-        progressMessage: true,
-      },
+      where: { nodeId: id, type: 'NODE_INSTALL' },
+      orderBy: { createdAt: 'desc' },
+      select: { status: true, progress: true, progressMessage: true },
     });
 
     if (!job) {
@@ -35,6 +26,6 @@ export async function GET(
     });
   } catch (error) {
     console.error('Failed to get install progress:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: 'INTERNAL_ERROR', message: 'Failed to get install progress' }, { status: 500 });
   }
-}
+});

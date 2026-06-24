@@ -31,28 +31,42 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const data = await apiFetch<{ jobs: Job[] }>('/api/jobs');
       setJobs(data.jobs || []);
+      if (silent) setError(null);
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         router.push('/login');
         return;
       }
-      const message = err instanceof Error ? err.message : 'Failed to load jobs';
-      setError(message);
-      toast({ variant: 'destructive', title: 'Failed to load jobs', description: message });
+      if (!silent) {
+        const message = err instanceof Error ? err.message : 'Failed to load jobs';
+        setError(message);
+        toast({ variant: 'destructive', title: 'Failed to load jobs', description: message });
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [router]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Auto-refresh while any job is still in flight, so PENDING/RUNNING jobs
+  // advance to their terminal state on screen without a manual refresh.
+  const hasActiveJob = jobs.some((j) => j.status === 'PENDING' || j.status === 'RUNNING');
+  useEffect(() => {
+    if (!hasActiveJob) return;
+    const t = setInterval(() => load(true), 5000);
+    return () => clearInterval(t);
+  }, [hasActiveJob, load]);
 
   const handleCancel = async (jobId: string) => {
     const ok = await confirm({
@@ -84,7 +98,7 @@ export default function JobsPage() {
           <h2 className="text-2xl font-bold">Jobs</h2>
           <p className="text-muted-foreground mt-1">Background job history</p>
         </div>
-        <Button variant="outline" onClick={load} disabled={loading} className="gap-2">
+        <Button variant="outline" onClick={() => load()} disabled={loading} className="gap-2">
           <RefreshCw className={loading ? 'animate-spin' : undefined} />
           Refresh
         </Button>

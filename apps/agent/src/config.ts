@@ -24,8 +24,17 @@ if (!apiToken) {
   process.exit(1);
 }
 
+// PANEL_URL must be configured — otherwise the agent would "start" and heartbeat
+// forever at a non-existent placeholder host. Fail fast instead.
+const panelUrl = (process.env.PANEL_URL || '').trim().replace(/\/$/, '');
+if (!panelUrl || panelUrl === 'https://panel.example.com') {
+  console.error('PANEL_URL is not configured (got:', JSON.stringify(panelUrl) || 'empty', ')');
+  console.error('Set PANEL_URL to the panel base URL (the install script does this).');
+  process.exit(1);
+}
+
 export const config = {
-  PANEL_URL: process.env.PANEL_URL || 'https://panel.example.com',
+  PANEL_URL: panelUrl,
   AGENT_TOKEN: apiToken,
   HEARTBEAT_INTERVAL: parseInt(process.env.AGENT_HEARTBEAT_INTERVAL || '30', 10),
   HEARTBEAT_TIMEOUT: parseInt(process.env.AGENT_HEARTBEAT_TIMEOUT || '10', 10),

@@ -82,19 +82,3 @@ export async function requireAuth(request: NextRequest): Promise<AuthPayload> {
 
   return payload as AuthPayload;
 }
-
-// For use in API routes
-export function withAuth(handler: (request: NextRequest, payload: AuthPayload) => Promise<Response>) {
-  return async (request: NextRequest) => {
-    const payload = await authenticateRequest(request);
-
-    if (!payload) {
-      return new Response(
-        JSON.stringify({ error: 'UNAUTHORIZED', message: 'Authentication required' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } },
-      );
-    }
-
-    return handler(request, payload);
-  };
-}
