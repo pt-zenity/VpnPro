@@ -54,7 +54,18 @@ interface NodeDetails {
   createdAt: string;
   healthStatus: {
     status: string;
-    details: { connectedClients?: number; cpu?: number; memory?: number; uptime?: number };
+    details: {
+      connectedClients?: number;
+      cpu?: number;
+      memory?: number;
+      memoryUsedMb?: number;
+      memoryTotalMb?: number;
+      disk?: number;
+      diskUsedGb?: number;
+      diskTotalGb?: number;
+      uptime?: number;
+      loadAvg?: number[];
+    };
     checkedAt: string;
   } | null;
 }
@@ -424,12 +435,27 @@ export default function NodeDetailsPage() {
       {node.healthStatus && node.status === 'HEALTHY' && (
         <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
           <h3 className="text-lg font-semibold mb-4">Health Status</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <MetricCard label="Connected Clients" value={node.healthStatus.details.connectedClients ?? 0} />
-            <MetricCard label="CPU" value={node.healthStatus.details.cpu != null ? `${node.healthStatus.details.cpu.toFixed(1)}%` : '-'} />
-            <MetricCard label="Memory" value={node.healthStatus.details.memory != null ? `${node.healthStatus.details.memory.toFixed(1)}%` : '-'} />
-            <MetricCard label="Uptime" value={node.healthStatus.details.uptime ? `${Math.floor(node.healthStatus.details.uptime / 3600)}h` : '-'} />
-          </div>
+          {(() => {
+            const d = node.healthStatus.details;
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <MetricCard label="Connected Clients" value={d.connectedClients ?? 0} />
+                <MetricCard label="CPU" value={d.cpu != null ? `${d.cpu.toFixed(1)}%` : '-'} />
+                <MetricCard
+                  label="Memory"
+                  value={d.memory != null ? `${d.memory.toFixed(1)}%` : '-'}
+                  sub={d.memoryUsedMb != null && d.memoryTotalMb != null ? `${fmtMb(d.memoryUsedMb)} / ${fmtMb(d.memoryTotalMb)}` : undefined}
+                />
+                <MetricCard
+                  label="Disk"
+                  value={d.disk != null ? `${d.disk}%` : '-'}
+                  sub={d.diskUsedGb != null && d.diskTotalGb != null ? `${d.diskUsedGb} / ${d.diskTotalGb} GB` : undefined}
+                />
+                <MetricCard label="Uptime" value={formatUptime(d.uptime)} />
+                <MetricCard label="Load avg" value={d.loadAvg && d.loadAvg.length ? d.loadAvg.map((n) => n.toFixed(2)).join('  ') : '-'} />
+              </div>
+            );
+          })()}
           {node.xorMask && (
             <div className="mt-4 pt-4 border-t border-border">
               <span className="text-sm text-muted-foreground">XOR Mask:</span>
@@ -476,11 +502,28 @@ function DetailCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string | number }) {
+function MetricCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div>
       <div className="text-2xl font-bold">{value}</div>
       <div className="text-sm text-muted-foreground">{label}</div>
+      {sub && <div className="mt-0.5 text-xs text-muted-foreground/70">{sub}</div>}
     </div>
   );
+}
+
+/** Seconds → "3d 4h" / "5h 12m" / "12m" / "-". */
+function formatUptime(seconds?: number): string {
+  if (!seconds || seconds <= 0) return '-';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d) return `${d}d ${h}h`;
+  if (h) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+/** MB → "512 MB" / "3.4 GB". */
+function fmtMb(mb: number): string {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
 }

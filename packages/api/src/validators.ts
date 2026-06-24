@@ -150,8 +150,13 @@ export const agentHeartbeatSchema = z.object({
       connectedClients: z.number().int().min(0).optional(),
       cpu: z.number().min(0).max(100).optional(),
       memory: z.number().min(0).optional(),
+      memoryUsedMb: z.number().min(0).optional(),
+      memoryTotalMb: z.number().min(0).optional(),
       disk: z.number().min(0).max(100).optional(),
+      diskUsedGb: z.number().min(0).optional(),
+      diskTotalGb: z.number().min(0).optional(),
       uptime: z.number().int().min(0).optional(),
+      loadAvg: z.array(z.number()).max(3).optional(),
     })
     .optional(),
   clients: z.array(clientTrafficSchema).max(5000).optional(),

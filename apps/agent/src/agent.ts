@@ -114,8 +114,13 @@ export class Agent {
           connectedClients: status.connectedClients || 0,
           cpu: details.cpu || 0,
           memory: details.memory || 0,
+          memoryUsedMb: details.memoryUsedMb,
+          memoryTotalMb: details.memoryTotalMb,
           disk: details.disk || 0,
+          diskUsedGb: details.diskUsedGb,
+          diskTotalGb: details.diskTotalGb,
           uptime: details.uptime || 0,
+          loadAvg: details.loadAvg,
         },
         ...(clients && clients.length > 0 ? { clients } : {}),
       });

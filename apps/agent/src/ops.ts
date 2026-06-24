@@ -79,10 +79,15 @@ export interface OpenVpnStatus {
 
 export interface OpenVpnDetails {
   connectedClients?: number;
-  cpu?: number;
-  memory?: number;
-  disk?: number;
-  uptime?: number;
+  cpu?: number;            // %
+  memory?: number;         // %
+  memoryUsedMb?: number;
+  memoryTotalMb?: number;
+  disk?: number;           // % (root fs)
+  diskUsedGb?: number;
+  diskTotalGb?: number;
+  uptime?: number;         // system uptime, seconds
+  loadAvg?: number[];      // [1m, 5m, 15m]
 }
 
 export interface CreateClientResult {
@@ -190,34 +195,66 @@ export class OpenVpnOps {
       // a fixed vmstat column index which mis-parsed to ~100% on some hosts).
       const cpu = await this.getCpuUsage();
 
-      // Memory from /proc/meminfo. Guard against memTotal === 0 so we never
+      // Memory from /proc/meminfo (kB). Guard against memTotal === 0 so we never
       // divide by zero and emit NaN to the panel.
       const { stdout: meminfo } = await exec('cat', ['/proc/meminfo']);
-      const memTotal = parseInt(meminfo.match(/MemTotal:\s+(\d+)/)?.[1] || '0', 10);
-      const memAvailable = parseInt(meminfo.match(/MemAvailable:\s+(\d+)/)?.[1] || '0', 10);
-      const memory = memTotal > 0 ? ((memTotal - memAvailable) / memTotal) * 100 : 0;
+      const memTotalKb = parseInt(meminfo.match(/MemTotal:\s+(\d+)/)?.[1] || '0', 10);
+      const memAvailKb = parseInt(meminfo.match(/MemAvailable:\s+(\d+)/)?.[1] || '0', 10);
+      const memory = memTotalKb > 0 ? ((memTotalKb - memAvailKb) / memTotalKb) * 100 : 0;
+      const memoryTotalMb = memTotalKb > 0 ? Math.round(memTotalKb / 1024) : undefined;
+      const memoryUsedMb = memTotalKb > 0 ? Math.round((memTotalKb - memAvailKb) / 1024) : undefined;
 
-      // Disk usage. Use `df --output=pcent /` which prints a header line and a
-      // single trailing percentage (e.g. "42%"), then strip the '%'. This is
-      // robust against column-count differences; fall back to 0 if unparseable.
+      // Root-fs usage: percent + used/total. `df -k --output=pcent,used,size /`
+      // prints a header then one data row in 1K blocks.
       let disk = 0;
+      let diskUsedGb: number | undefined;
+      let diskTotalGb: number | undefined;
       try {
-        const { stdout: dfOut } = await exec('df', ['--output=pcent', '/']);
-        const pctMatch = dfOut.match(/(\d+)\s*%/);
-        if (pctMatch?.[1]) {
-          const parsed = parseInt(pctMatch[1], 10);
-          if (!Number.isNaN(parsed)) {
-            disk = parsed;
-          }
-        }
+        const { stdout: dfOut } = await exec('df', ['-k', '--output=pcent,used,size', '/']);
+        const rows = dfOut.trim().split('\n');
+        const cols = (rows[rows.length - 1] || '').trim().split(/\s+/);
+        const pct = parseInt((cols[0] || '').replace('%', ''), 10);
+        const usedKb = parseInt(cols[1] || '', 10);
+        const sizeKb = parseInt(cols[2] || '', 10);
+        if (!Number.isNaN(pct)) disk = pct;
+        if (!Number.isNaN(usedKb)) diskUsedGb = Math.round((usedKb / 1024 / 1024) * 10) / 10;
+        if (!Number.isNaN(sizeKb)) diskTotalGb = Math.round((sizeKb / 1024 / 1024) * 10) / 10;
       } catch {
-        // df unavailable or unexpected output; leave disk at 0.
+        // df unavailable or unexpected output; leave defaults.
+      }
+
+      // System uptime (seconds) from /proc/uptime.
+      let uptime = 0;
+      try {
+        const { stdout: up } = await exec('cat', ['/proc/uptime']);
+        uptime = Math.floor(parseFloat(up.trim().split(/\s+/)[0]) || 0);
+      } catch {
+        // leave 0
+      }
+
+      // Load average (1/5/15 min) from /proc/loadavg.
+      let loadAvg: number[] | undefined;
+      try {
+        const { stdout: la } = await exec('cat', ['/proc/loadavg']);
+        const p = la.trim().split(/\s+/);
+        loadAvg = [0, 1, 2].map((i) => {
+          const n = parseFloat(p[i]);
+          return Number.isNaN(n) ? 0 : Math.round(n * 100) / 100;
+        });
+      } catch {
+        // no load average
       }
 
       return {
         cpu: Number.isNaN(cpu) ? 0 : cpu,
-        memory: Number.isNaN(memory) ? 0 : memory,
+        memory: Number.isNaN(memory) ? 0 : Math.round(memory * 10) / 10,
+        memoryUsedMb,
+        memoryTotalMb,
         disk,
+        diskUsedGb,
+        diskTotalGb,
+        uptime,
+        loadAvg,
         connectedClients: await this.getConnectedClientCount(),
       };
     } catch (error) {
@@ -242,12 +279,14 @@ export class OpenVpnOps {
       return { idle, total };
     };
     const a = await sample();
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, 500));
     const b = await sample();
     const dTotal = b.total - a.total;
     const dIdle = b.idle - a.idle;
     if (dTotal <= 0) return 0;
-    return Math.max(0, Math.min(100, Math.round(((dTotal - dIdle) / dTotal) * 100)));
+    // One-decimal precision so a lightly-loaded server reads e.g. 0.4%, not a flat 0.
+    const pct = ((dTotal - dIdle) / dTotal) * 100;
+    return Math.max(0, Math.min(100, Math.round(pct * 10) / 10));
   }
 
   /**
