@@ -56,6 +56,10 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
       );
     }
 
+    // `obfuscation` is the source of truth; fall back to the legacy useXor flag.
+    const obfuscation = input.obfuscation ?? (input.useXor === false ? 'none' : 'xormask');
+    const useXor = obfuscation !== 'none';
+
     // Create install job
     const job = await prisma.job.create({
       data: {
@@ -68,7 +72,13 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
           port: input.port,
           protocol: input.protocol,
           firstUser: input.firstUser,
-          useXor: input.useXor,
+          obfuscation,
+          useXor,
+          cipher: input.cipher,
+          auth: input.auth,
+          tunnelMode: input.tunnelMode,
+          clientToClient: input.clientToClient,
+          duplicateCn: input.duplicateCn,
           domain: input.domain,
           dnsMode: input.dnsMode,
           customDns: input.customDns,
@@ -80,14 +90,23 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
       },
     });
 
-    // Update node status and save settings
+    // Update node status and save the chosen settings so the panel reflects the
+    // live config and can pre-fill the dialog on a reconfigure.
     await prisma.node.update({
       where: { id },
-      data: { 
+      data: {
         status: 'PROVISIONING',
-        useXor: input.useXor,
+        protocol: input.protocol,
+        ovpnPort: input.port,
+        obfuscation,
+        useXor,
+        cipher: input.cipher,
+        authDigest: input.auth,
+        tunnelMode: input.tunnelMode,
+        clientToClient: input.clientToClient,
+        duplicateCn: input.duplicateCn,
         domain: input.domain || null,
-        dnsServers: input.dnsMode === 'standard' ? ['8.8.8.8', '1.1.1.1'] : 
+        dnsServers: input.dnsMode === 'standard' ? ['8.8.8.8', '1.1.1.1'] :
                     input.dnsMode === 'custom' && input.customDns ? input.customDns.split(',').map(s => s.trim()) : [],
         mtu: input.mtu,
         mssfix: input.mssfix,

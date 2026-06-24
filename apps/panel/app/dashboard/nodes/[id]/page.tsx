@@ -37,6 +37,18 @@ interface NodeDetails {
   openvpnVersion: string | null;
   metadata?: NodeMetadata | null;
   xorMask: string | null;
+  protocol?: string | null;
+  ovpnPort?: number | null;
+  obfuscation?: string | null;
+  cipher?: string | null;
+  authDigest?: string | null;
+  tunnelMode?: string | null;
+  clientToClient?: boolean | null;
+  duplicateCn?: boolean | null;
+  domain?: string | null;
+  dnsServers?: string[] | null;
+  mtu?: number | null;
+  mssfix?: number | null;
   lastHeartbeatAt: string | null;
   installedAt: string | null;
   createdAt: string;
@@ -46,6 +58,14 @@ interface NodeDetails {
     checkedAt: string;
   } | null;
 }
+
+const OBFUSCATION_LABELS: Record<string, string> = {
+  none: 'None',
+  xormask: 'XOR mask',
+  xorptrpos: 'XOR position',
+  reverse: 'Reverse',
+  obfuscate: 'Obfuscate (compound)',
+};
 
 export default function NodeDetailsPage() {
   const params = useParams();
@@ -261,6 +281,19 @@ export default function NodeDetailsPage() {
         <InstallNodeDialog
           nodeId={node.id}
           defaultHost={node.host}
+          defaults={{
+            protocol: (node.protocol as 'udp' | 'tcp') ?? undefined,
+            port: node.ovpnPort ?? undefined,
+            obfuscation: (node.obfuscation as 'none' | 'xormask' | 'xorptrpos' | 'reverse' | 'obfuscate') ?? undefined,
+            cipher: (node.cipher as 'AES-256-GCM' | 'AES-128-GCM' | 'CHACHA20-POLY1305') ?? undefined,
+            auth: (node.authDigest as 'SHA256' | 'SHA512') ?? undefined,
+            tunnelMode: (node.tunnelMode as 'full' | 'split') ?? undefined,
+            clientToClient: node.clientToClient ?? undefined,
+            duplicateCn: node.duplicateCn ?? undefined,
+            domain: node.domain ?? undefined,
+            mtu: node.mtu ?? undefined,
+            mssfix: node.mssfix ?? undefined,
+          }}
           onClose={() => setShowInstallDialog(false)}
           onSuccess={() => {
             setShowInstallDialog(false);
@@ -362,6 +395,29 @@ export default function NodeDetailsPage() {
         <DetailCard label="Last Heartbeat" value={node.lastHeartbeatAt ? new Date(node.lastHeartbeatAt).toLocaleString() : 'Never'} />
         <DetailCard label="Created" value={new Date(node.createdAt).toLocaleString()} />
       </div>
+
+      {(isInstalled || node.status === 'PROVISIONING') && node.obfuscation && (
+        <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Server Configuration</h3>
+            {canInstall && (
+              <Button variant="outline" size="sm" onClick={() => setShowInstallDialog(true)}>Reconfigure</Button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <DetailCard label="Obfuscation" value={OBFUSCATION_LABELS[node.obfuscation] ?? node.obfuscation} />
+            <DetailCard label="Transport" value={`${(node.protocol ?? 'udp').toUpperCase()} / ${node.ovpnPort ?? 443}`} />
+            <DetailCard label="Cipher" value={node.cipher ?? '-'} />
+            <DetailCard label="Auth" value={node.authDigest ?? '-'} />
+            <DetailCard label="Routing" value={node.tunnelMode === 'split' ? 'Split tunnel' : 'Full tunnel'} />
+            <DetailCard label="Client-to-client" value={node.clientToClient ? 'On' : 'Off'} />
+            <DetailCard label="Multiple devices/cert" value={node.duplicateCn ? 'On' : 'Off'} />
+            <DetailCard label="DNS" value={node.dnsServers && node.dnsServers.length ? node.dnsServers.join(', ') : 'Not pushed'} />
+            <DetailCard label="MTU / MSSFIX" value={`${node.mtu ?? 1500} / ${node.mssfix ?? 1360}`} />
+            <DetailCard label="Client remote" value={node.domain || node.host} />
+          </div>
+        </div>
+      )}
 
       {node.healthStatus && node.status === 'HEALTHY' && (
         <div className="bg-card text-card-foreground border border-border rounded-lg p-6">

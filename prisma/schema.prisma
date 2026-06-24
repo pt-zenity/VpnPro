@@ -65,6 +65,16 @@ model Node {
   mtu            Int          @default(1500)
   mssfix         Int          @default(1360)
 
+  // OpenVPN server configuration (applied on install/reconfigure).
+  protocol       String       @default("udp")           // udp | tcp
+  ovpnPort       Int          @default(443)              // OpenVPN listen port (separate from SSH `port`)
+  obfuscation    String       @default("xormask")        // none | xormask | xorptrpos | reverse | obfuscate
+  cipher         String       @default("AES-256-GCM")     // data-channel cipher (AEAD)
+  authDigest     String       @default("SHA256")          // SHA256 | SHA512
+  tunnelMode     String       @default("full")            // full (redirect-gateway) | split
+  clientToClient Boolean      @default(false)
+  duplicateCn    Boolean      @default(false)
+
   lastHeartbeatAt DateTime?
   installedAt     DateTime?
   createdAt       DateTime   @default(now())

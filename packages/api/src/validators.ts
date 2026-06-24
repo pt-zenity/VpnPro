@@ -63,12 +63,32 @@ export const updateNodeSchema = z.object({
 
 export type UpdateNodeInput = z.infer<typeof updateNodeSchema>;
 
+// Obfuscation transforms supported by the openvpn-xorpatch `scramble` directive.
+//   none      — plain OpenVPN (no scramble)
+//   xormask   — XOR every byte with a random key (the classic XOR patch)
+//   xorptrpos — XOR every byte with its buffer position
+//   reverse   — reverse the byte order of each buffer
+//   obfuscate — compound transform (xormask + xorptrpos + reverse), keyed
+export const OBFUSCATION_MODES = ['none', 'xormask', 'xorptrpos', 'reverse', 'obfuscate'] as const;
+export const DATA_CIPHERS = ['AES-256-GCM', 'AES-128-GCM', 'CHACHA20-POLY1305'] as const;
+export const AUTH_DIGESTS = ['SHA256', 'SHA512'] as const;
+
 export const installNodeSchema = z.object({
   serverHost: hostSchema.optional(),
   port: z.number().int().min(1).max(65535).optional().default(443),
   protocol: z.enum(['udp', 'tcp']).optional().default('udp'),
   firstUser: clientNameSchema.optional(),
+  // Obfuscation. `obfuscation` is the source of truth; `useXor` is kept for
+  // backward compatibility with older callers (true ⇒ xormask, false ⇒ none).
+  obfuscation: z.enum(OBFUSCATION_MODES).optional(),
   useXor: z.boolean().optional().default(true),
+  // Crypto knobs (safe AEAD defaults).
+  cipher: z.enum(DATA_CIPHERS).optional().default('AES-256-GCM'),
+  auth: z.enum(AUTH_DIGESTS).optional().default('SHA256'),
+  // Routing / topology.
+  tunnelMode: z.enum(['full', 'split']).optional().default('full'),
+  clientToClient: z.boolean().optional().default(false),
+  duplicateCn: z.boolean().optional().default(false),
   domain: z.string().optional(),
   dnsMode: z.enum(['standard', 'empty', 'custom']).optional().default('standard'),
   customDns: z.string().optional(),

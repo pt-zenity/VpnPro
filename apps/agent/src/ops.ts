@@ -486,12 +486,24 @@ export class OpenVpnOps {
       throw new Error('OpenVPN installer script not found on this node');
     }
 
+    // `obfuscation` is the source of truth; derive it from the legacy useXor flag
+    // when an older panel doesn't send it. USE_XOR is still exported so the
+    // installer's mask-persistence logic keeps working.
+    const obfuscation: string =
+      payload.obfuscation ?? (payload.useXor === false ? 'none' : 'xormask');
+
     const env = {
       ...process.env,
       SERVER_HOST: payload.serverHost ? String(payload.serverHost) : '',
       PORT: String(payload.port ?? 443),
       PROTO: String(payload.protocol ?? 'udp'),
-      USE_XOR: payload.useXor === false ? '0' : '1',
+      OBFUSCATION: obfuscation,
+      USE_XOR: obfuscation !== 'none' ? '1' : '0',
+      CIPHER: String(payload.cipher ?? 'AES-256-GCM'),
+      AUTH: String(payload.auth ?? 'SHA256'),
+      TUNNEL_MODE: String(payload.tunnelMode ?? 'full'),
+      CLIENT_TO_CLIENT: payload.clientToClient ? '1' : '0',
+      DUPLICATE_CN: payload.duplicateCn ? '1' : '0',
       DNS_MODE: String(payload.dnsMode ?? 'standard'),
       CUSTOM_DNS: payload.customDns ? String(payload.customDns) : '',
       DOMAIN: payload.domain ? String(payload.domain) : '',

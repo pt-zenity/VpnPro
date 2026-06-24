@@ -23,6 +23,24 @@ MTU="${MTU:-1500}"
 MSSFIX="${MSSFIX:-1360}"
 DOMAIN="${DOMAIN:-}"              # client 'remote' uses this if set, else SERVER_HOST
 RESTORE="${RESTORE:-0}"          # 1 = a PKI backup was restored; keep it, don't regenerate
+
+# --- Configurable OpenVPN options (passed by the panel on NODE_INSTALL) -------
+# Obfuscation transform applied by the XOR patch's `scramble` directive.
+#   none | xormask | xorptrpos | reverse | obfuscate
+OBFUSCATION="${OBFUSCATION:-}"
+CIPHER="${CIPHER:-AES-256-GCM}"          # data-channel AEAD cipher (primary)
+AUTH="${AUTH:-SHA256}"                   # HMAC digest (SHA256 | SHA512)
+TUNNEL_MODE="${TUNNEL_MODE:-full}"       # full = redirect all traffic | split = VPN subnet only
+CLIENT_TO_CLIENT="${CLIENT_TO_CLIENT:-0}"
+DUPLICATE_CN="${DUPLICATE_CN:-0}"
+
+# Back-compat: derive OBFUSCATION from the legacy USE_XOR flag when not given,
+# then keep USE_XOR consistent (used by the XOR-mask persistence logic below).
+if [[ -z "$OBFUSCATION" ]]; then
+  [[ "$USE_XOR" == "1" ]] && OBFUSCATION="xormask" || OBFUSCATION="none"
+fi
+[[ "$OBFUSCATION" == "none" ]] && USE_XOR=0 || USE_XOR=1
+
 VPN_SUBNET="10.8.0.0"
 VPN_NETMASK="255.255.255.0"
 
@@ -77,6 +95,29 @@ else
 fi
 
 # --- Config renderers (shared by the fresh-install and reconfigure paths) ---
+
+# The `scramble` directive for the chosen obfuscation mode (empty for none).
+# Server and client MUST carry the identical line.
+render_scramble_line() {
+  case "$OBFUSCATION" in
+    xormask)   echo "scramble xormask $XOR_MASK" ;;
+    xorptrpos) echo "scramble xorptrpos" ;;
+    reverse)   echo "scramble reverse" ;;
+    obfuscate) echo "scramble obfuscate $XOR_MASK" ;;
+    *)         : ;;   # none → no scramble line
+  esac
+}
+
+# data-ciphers list with the chosen primary first, the rest as negotiable
+# fallbacks (all AEAD, DCO-compatible). Server and client must agree.
+render_cipher_list() {
+  local out="$CIPHER" c
+  for c in AES-256-GCM AES-128-GCM CHACHA20-POLY1305; do
+    [[ "$c" != "$CIPHER" ]] && out="$out:$c"
+  done
+  echo "$out"
+}
+
 render_dns_pushes() {
   case "$DNS_MODE" in
     empty) : ;;                                  # push no DNS
@@ -137,18 +178,21 @@ tls-groups secp256r1
 tls-crypt $OVPN_DIR/tls-crypt.key
 crl-verify $OVPN_DIR/crl.pem
 
-data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
-data-ciphers-fallback AES-256-GCM
-auth SHA256
+data-ciphers $(render_cipher_list)
+data-ciphers-fallback $CIPHER
+auth $AUTH
 
 keepalive 10 120
 tun-mtu $MTU
 mssfix $MSSFIX
-
-push "redirect-gateway def1 bypass-dhcp"
 EOF
+    # Full tunnel = push a default route; split tunnel = only the VPN subnet.
+    [[ "$TUNNEL_MODE" == "split" ]] || echo 'push "redirect-gateway def1 bypass-dhcp"'
     render_dns_pushes
-    [[ "$USE_XOR" == "1" ]] && echo "scramble xormask $XOR_MASK"
+    [[ "$CLIENT_TO_CLIENT" == "1" ]] && echo "client-to-client"
+    [[ "$DUPLICATE_CN" == "1" ]] && echo "duplicate-cn"
+    local scramble; scramble="$(render_scramble_line)"
+    [[ -n "$scramble" ]] && echo "$scramble"
     cat <<EOF
 
 verb 3
@@ -158,9 +202,9 @@ log-append /var/log/openvpn-xor.log
 
 script-security 2
 client-disconnect $OVPN_DIR/client-disconnect.sh
-
-explicit-exit-notify 1
 EOF
+    # explicit-exit-notify is UDP-only; it errors the parser on TCP.
+    [[ "$PROTO" == "udp" ]] && echo "explicit-exit-notify 1"
   } > "$OVPN_DIR/server.conf"
 }
 
@@ -173,6 +217,10 @@ CLIENT_REMOTE=$REMOTE_HOST
 PORT=$PORT
 PROTO=$PROTO
 USE_XOR=$USE_XOR
+OBFUSCATION=$OBFUSCATION
+CIPHER=$CIPHER
+AUTH=$AUTH
+TUNNEL_MODE=$TUNNEL_MODE
 MTU=$MTU
 MSSFIX=$MSSFIX
 XOR_MASK=$XOR_MASK
@@ -206,11 +254,27 @@ fi
 
 source /root/ovpn-xor-admin/config.env
 
-# Client scramble line must match the server (omitted when XOR is disabled).
-SCRAMBLE_LINE=""
-if [[ "${USE_XOR:-1}" == "1" ]]; then
-  SCRAMBLE_LINE="scramble xormask $XOR_MASK"
+# Client scramble line must match the server EXACTLY. Derive it from the
+# obfuscation mode (falling back to the legacy USE_XOR flag for old installs).
+OBFUSCATION="${OBFUSCATION:-}"
+if [[ -z "$OBFUSCATION" ]]; then
+  [[ "${USE_XOR:-1}" == "1" ]] && OBFUSCATION="xormask" || OBFUSCATION="none"
 fi
+SCRAMBLE_LINE=""
+case "$OBFUSCATION" in
+  xormask)   SCRAMBLE_LINE="scramble xormask $XOR_MASK" ;;
+  xorptrpos) SCRAMBLE_LINE="scramble xorptrpos" ;;
+  reverse)   SCRAMBLE_LINE="scramble reverse" ;;
+  obfuscate) SCRAMBLE_LINE="scramble obfuscate $XOR_MASK" ;;
+esac
+
+# data-ciphers / auth must also match the server.
+CIPHER="${CIPHER:-AES-256-GCM}"
+AUTH="${AUTH:-SHA256}"
+DATA_CIPHERS="$CIPHER"
+for c in AES-256-GCM AES-128-GCM CHACHA20-POLY1305; do
+  [[ "$c" != "$CIPHER" ]] && DATA_CIPHERS="$DATA_CIPHERS:$c"
+done
 
 mkdir -p "$CLIENTS_DIR"
 
@@ -243,9 +307,9 @@ persist-tun
 
 remote-cert-tls server
 
-data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305
-data-ciphers-fallback AES-256-GCM
-auth SHA256
+data-ciphers $DATA_CIPHERS
+data-ciphers-fallback $CIPHER
+auth $AUTH
 
 tun-mtu $MTU
 mssfix $MSSFIX
@@ -292,13 +356,24 @@ EOF
 # working). This is what makes changing XOR/DNS/domain/MTU cheap and safe.
 if [[ -x "$OVPN_BIN" && -f "$EASYRSA_DIR/pki/ca.crt" ]]; then
   echo "=== OpenVPN already installed - reconfiguring only ==="
-  echo "USE_XOR=$USE_XOR DNS_MODE=$DNS_MODE DOMAIN=${DOMAIN:-<server ip>} MTU=$MTU MSSFIX=$MSSFIX"
+  echo "OBFUSCATION=$OBFUSCATION CIPHER=$CIPHER AUTH=$AUTH PROTO=$PROTO PORT=$PORT TUNNEL=$TUNNEL_MODE C2C=$CLIENT_TO_CLIENT DUP=$DUPLICATE_CN DNS=$DNS_MODE DOMAIN=${DOMAIN:-<server ip>} MTU=$MTU MSSFIX=$MSSFIX"
   install_disconnect_hook
   write_server_conf
   write_config_env
   write_add_user_script
+  # The listen port/proto may have changed on reconfigure — make sure the new
+  # one is open (idempotent; old rules linger harmlessly until a full reinstall).
+  iptables -C INPUT -p "$PROTO" --dport "$PORT" -j ACCEPT 2>/dev/null || \
+    iptables -A INPUT -p "$PROTO" --dport "$PORT" -j ACCEPT
+  netfilter-persistent save 2>/dev/null || true
   systemctl restart openvpn-xor 2>/dev/null || systemctl start openvpn-xor 2>/dev/null || true
-  echo "OK: reconfigured"
+  sleep 1
+  systemctl is-active --quiet openvpn-xor && echo "OK: reconfigured" || {
+    echo "ERROR: openvpn-xor failed to start after reconfigure"
+    tail -40 /var/log/openvpn-xor.log 2>/dev/null || true
+    journalctl -u openvpn-xor -n 40 --no-pager 2>/dev/null || true
+    exit 1
+  }
   exit 0
 fi
 
@@ -542,8 +617,8 @@ echo "External interface: $EXT_IFACE"
 
 echo "=== Configure firewall/NAT ==="
 
-iptables -C INPUT -p udp --dport "$PORT" -j ACCEPT 2>/dev/null || \
-iptables -A INPUT -p udp --dport "$PORT" -j ACCEPT
+iptables -C INPUT -p "$PROTO" --dport "$PORT" -j ACCEPT 2>/dev/null || \
+iptables -A INPUT -p "$PROTO" --dport "$PORT" -j ACCEPT
 
 iptables -C INPUT -i tun+ -j ACCEPT 2>/dev/null || \
 iptables -A INPUT -i tun+ -j ACCEPT
