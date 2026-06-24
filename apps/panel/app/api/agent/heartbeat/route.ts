@@ -59,6 +59,9 @@ export async function POST(request: NextRequest) {
         lastHeartbeatAt: now,
         status: newStatus,
         installedAt: newStatus === 'HEALTHY' && !node.installedAt ? now : node.installedAt,
+        // Keep the displayed OpenVPN version / XOR mask in sync with the node.
+        ...(input.openvpnVersion ? { openvpnVersion: input.openvpnVersion } : {}),
+        ...(input.xorMask ? { xorMask: input.xorMask } : {}),
       },
     });
 

@@ -119,6 +119,8 @@ export type ClientTrafficInput = z.infer<typeof clientTrafficSchema>;
 export const agentHeartbeatSchema = z.object({
   nodeId: nodeIdSchema,
   status: z.enum(['INSTALLING', 'NOT_INSTALLED', 'RUNNING', 'STOPPED', 'ERROR']),
+  openvpnVersion: z.string().max(40).optional(),
+  xorMask: z.string().max(128).optional(),
   details: z
     .object({
       connectedClients: z.number().int().min(0).optional(),

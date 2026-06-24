@@ -108,6 +108,8 @@ export class Agent {
         // Report the real OpenVPN state. NOT_INSTALLED is the normal pre-install
         // state and must not be conflated with a failure.
         status: status.openvpn,
+        ...(status.version ? { openvpnVersion: status.version } : {}),
+        ...(status.xorMask ? { xorMask: status.xorMask } : {}),
         details: {
           connectedClients: status.connectedClients || 0,
           cpu: details.cpu || 0,
