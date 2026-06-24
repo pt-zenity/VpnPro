@@ -86,7 +86,7 @@ function ActivityCell({ client }: { client: Client }) {
   );
 }
 
-const TH = 'px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase';
+const TH = 'px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase';
 
 /** Expiry cell: shows the date the config stops working + a relative hint. */
 function ExpiryCell({ expiresAt, status }: { expiresAt?: string | null; status: string }) {
@@ -247,6 +247,61 @@ export default function NodeClientsPage() {
     }
   };
 
+  // Row actions, shared by the desktop table (icon-only, compact) and the mobile
+  // cards (icon + label). One source of truth so behaviour can't drift.
+  const renderActions = (client: Client, iconOnly: boolean) => {
+    const canDownload = (client.status === 'ACTIVE' || client.status === 'DISABLED') && client.artifactCount > 0;
+    const canToggle = client.status === 'ACTIVE' || client.status === 'DISABLED';
+    const canDelete = client.status !== 'REVOKED';
+    const enabling = client.status === 'DISABLED';
+    return (
+      <>
+        {canDownload && (
+          <Button
+            variant="outline"
+            size={iconOnly ? 'icon' : 'sm'}
+            className={iconOnly ? '' : 'gap-1.5'}
+            onClick={() => handleDownload(client.id, client.name)}
+            disabled={downloadingId === client.id}
+            aria-label={`Download ${client.name}.ovpn`}
+            title="Download .ovpn config"
+          >
+            <Download className="h-4 w-4" />
+            {!iconOnly && (downloadingId === client.id ? 'Downloading…' : 'Download')}
+          </Button>
+        )}
+        {canToggle && (
+          <Button
+            variant="ghost"
+            size={iconOnly ? 'icon' : 'sm'}
+            className={iconOnly ? '' : 'gap-1.5'}
+            onClick={() => handleToggle(client)}
+            disabled={busyId === client.id}
+            aria-label={enabling ? `Enable ${client.name}` : `Disable ${client.name}`}
+            title={enabling ? 'Enable this client' : 'Temporarily block this client'}
+          >
+            {enabling ? <Power className="h-4 w-4 text-emerald-400" /> : <PowerOff className="h-4 w-4 text-yellow-400" />}
+            {!iconOnly && (enabling ? 'Enable' : 'Disable')}
+          </Button>
+        )}
+        {canDelete && (
+          <Button
+            variant="ghost"
+            size={iconOnly ? 'icon' : 'sm'}
+            className={`text-destructive hover:text-destructive hover:bg-destructive/10 ${iconOnly ? '' : 'gap-1.5'}`}
+            onClick={() => handleDelete(client.id, client.name)}
+            disabled={busyId === client.id}
+            aria-label={`Delete ${client.name}`}
+            title="Delete permanently"
+          >
+            <Trash2 className="h-4 w-4" />
+            {!iconOnly && 'Delete'}
+          </Button>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center gap-4">
@@ -284,17 +339,16 @@ export default function NodeClientsPage() {
           </Button>
         </div>
       ) : (
-        <div className="bg-card text-card-foreground border border-border rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+        <>
+          {/* Desktop (lg+): compact table — everything fits, no horizontal scroll. */}
+          <div className="hidden lg:block bg-card text-card-foreground border border-border rounded-lg overflow-hidden">
+            <table className="w-full table-auto">
               <caption className="sr-only">VPN clients for this node</caption>
               <thead className="bg-muted">
                 <tr>
-                  <th scope="col" className={TH}>Name</th>
-                  <th scope="col" className={TH}>Status</th>
+                  <th scope="col" className={TH}>Client</th>
                   <th scope="col" className={TH}>Activity</th>
-                  <th scope="col" className={TH}>Traffic (↑ up / ↓ down)</th>
-                  <th scope="col" className={TH}>Created</th>
+                  <th scope="col" className={TH}>Traffic</th>
                   <th scope="col" className={TH}>Expires</th>
                   <th scope="col" className={`${TH} text-right`}>Actions</th>
                 </tr>
@@ -304,7 +358,7 @@ export default function NodeClientsPage() {
                   const status = getClientStatus(client.status);
                   return (
                     <tr key={client.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3 align-top">
                         <div className="flex items-center gap-2">
                           <span
                             className={`h-2 w-2 shrink-0 rounded-full ${client.online ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}
@@ -312,72 +366,25 @@ export default function NodeClientsPage() {
                             aria-label={client.online ? 'Online' : 'Offline'}
                           />
                           <span className="font-medium text-foreground">{client.name}</span>
+                          <Badge variant={status.variant} className="ml-1">{status.label}</Badge>
                         </div>
-                        <div className="ml-4 text-xs text-muted-foreground font-mono">
+                        <div className="ml-4 mt-0.5 font-mono text-xs text-muted-foreground">
                           {client.fingerprint.slice(0, 16)}…
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge variant={status.variant}>{status.label}</Badge>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3 align-top text-sm">
                         <ActivityCell client={client} />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-4 py-3 align-top whitespace-nowrap text-sm">
                         <span className="text-emerald-400">↑ {formatBytes(client.bytesUp)}</span>
-                        <span className="mx-1.5 text-muted-foreground">/</span>
+                        <span className="mx-1 text-muted-foreground">/</span>
                         <span className="text-blue-400">↓ {formatBytes(client.bytesDown)}</span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                        {new Date(client.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <td className="px-4 py-3 align-top whitespace-nowrap text-sm">
                         <ExpiryCell expiresAt={client.expiresAt} status={client.status} />
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex justify-end gap-2">
-                          {(client.status === 'ACTIVE' || client.status === 'DISABLED') && client.artifactCount > 0 && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1.5"
-                              onClick={() => handleDownload(client.id, client.name)}
-                              disabled={downloadingId === client.id}
-                            >
-                              <Download className="h-4 w-4" />
-                              {downloadingId === client.id ? 'Downloading…' : 'Download'}
-                            </Button>
-                          )}
-                          {(client.status === 'ACTIVE' || client.status === 'DISABLED') && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="gap-1.5"
-                              onClick={() => handleToggle(client)}
-                              disabled={busyId === client.id}
-                              title={client.status === 'DISABLED' ? 'Enable this client' : 'Temporarily block this client'}
-                            >
-                              {client.status === 'DISABLED' ? (
-                                <><Power className="h-4 w-4 text-emerald-400" />Enable</>
-                              ) : (
-                                <><PowerOff className="h-4 w-4 text-yellow-400" />Disable</>
-                              )}
-                            </Button>
-                          )}
-                          {client.status !== 'REVOKED' && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label={`Delete ${client.name}`}
-                              title="Delete permanently"
-                              onClick={() => handleDelete(client.id, client.name)}
-                              disabled={busyId === client.id}
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
+                      <td className="px-4 py-3 align-top whitespace-nowrap text-right">
+                        <div className="flex justify-end gap-1">{renderActions(client, true)}</div>
                       </td>
                     </tr>
                   );
@@ -385,7 +392,52 @@ export default function NodeClientsPage() {
               </tbody>
             </table>
           </div>
-        </div>
+
+          {/* Mobile / tablet (<lg): cards — no horizontal scroll, everything stacked. */}
+          <div className="space-y-3 lg:hidden">
+            {clients.map((client) => {
+              const status = getClientStatus(client.status);
+              return (
+                <div key={client.id} className="space-y-3 rounded-lg border border-border bg-card p-4 text-card-foreground">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`h-2 w-2 shrink-0 rounded-full ${client.online ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}
+                          aria-label={client.online ? 'Online' : 'Offline'}
+                        />
+                        <span className="truncate font-medium text-foreground">{client.name}</span>
+                      </div>
+                      <div className="ml-4 truncate font-mono text-xs text-muted-foreground">
+                        {client.fingerprint.slice(0, 16)}…
+                      </div>
+                    </div>
+                    <Badge variant={status.variant} className="shrink-0">{status.label}</Badge>
+                  </div>
+
+                  <ActivityCell client={client} />
+
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+                    <dt className="text-muted-foreground">Traffic</dt>
+                    <dd className="text-right">
+                      <span className="text-emerald-400">↑ {formatBytes(client.bytesUp)}</span>
+                      <span className="mx-1 text-muted-foreground">/</span>
+                      <span className="text-blue-400">↓ {formatBytes(client.bytesDown)}</span>
+                    </dd>
+                    <dt className="text-muted-foreground">Expires</dt>
+                    <dd className="text-right"><ExpiryCell expiresAt={client.expiresAt} status={client.status} /></dd>
+                    <dt className="text-muted-foreground">Created</dt>
+                    <dd className="text-right text-muted-foreground">{new Date(client.createdAt).toLocaleDateString()}</dd>
+                  </dl>
+
+                  <div className="flex flex-wrap gap-2 border-t border-border/50 pt-3">
+                    {renderActions(client, false)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
