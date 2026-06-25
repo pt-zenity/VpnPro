@@ -579,6 +579,14 @@ if [[ -f "$EASYRSA_DIR/pki/ca.crt" ]]; then
   cp -f "$EASYRSA_DIR/pki/crl.pem" "$OVPN_DIR/crl.pem" 2>/dev/null || true
   chmod 644 "$OVPN_DIR/crl.pem" 2>/dev/null || true
 else
+  # make-cadir copies the easy-rsa templates from /usr/share/easy-rsa. The apt
+  # package can be marked installed while its files are absent (partial image,
+  # manual cleanup), which makes make-cadir fail with "cannot stat
+  # openssl-easyrsa.cnf". Guarantee the templates exist before using them.
+  if [[ ! -f /usr/share/easy-rsa/openssl-easyrsa.cnf ]]; then
+    echo "easy-rsa templates missing — (re)installing the package…"
+    apt-get install -y --reinstall easy-rsa
+  fi
   make-cadir "$EASYRSA_DIR"
   cd "$EASYRSA_DIR"
 
