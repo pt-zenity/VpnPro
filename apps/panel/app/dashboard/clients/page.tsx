@@ -9,12 +9,10 @@ import { apiFetch, apiFetchRaw, UnauthorizedError } from '@/components/use-api';
 import { toast } from '@/components/ui/use-toast';
 import { confirm } from '@/components/ui/confirm-dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/spinner';
-import { getClientStatus } from '@/components/status-config';
-import { formatBytes, ActivityCell, ExpiryCell } from '@/components/client-ui';
+import { formatBytes, ActivityCell, ExpiryCell, ClientStatusDot } from '@/components/client-ui';
 
 interface Client {
   id: string;
@@ -281,7 +279,6 @@ export default function ClientsPage() {
                 <tr>
                   <th scope="col" className={TH}>Client</th>
                   <th scope="col" className={TH}>Node</th>
-                  <th scope="col" className={TH}>Status</th>
                   <th scope="col" className={TH}>Activity</th>
                   <th scope="col" className={TH}>Traffic</th>
                   <th scope="col" className={TH}>Expires</th>
@@ -290,15 +287,14 @@ export default function ClientsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {clients.map((c) => {
-                  const st = getClientStatus(c.status);
                   return (
                     <tr key={c.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-4 py-3 align-top">
                         <div className="flex items-center gap-2">
-                          <span className={`h-2 w-2 shrink-0 rounded-full ${c.online ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} aria-label={c.online ? 'Online' : 'Offline'} />
+                          <ClientStatusDot status={c.status} />
                           <span className="font-medium text-foreground">{c.name}</span>
                         </div>
-                        <div className="ml-4 mt-0.5 truncate text-xs text-muted-foreground">by {c.createdByEmail ?? 'unknown'}</div>
+                        <div className="ml-[18px] mt-0.5 truncate text-xs text-muted-foreground">by {c.createdByEmail ?? 'unknown'}</div>
                       </td>
                       <td className="px-4 py-3 align-top whitespace-nowrap text-sm">
                         <Link href={`/dashboard/nodes/${c.nodeId}`} className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground">
@@ -306,7 +302,6 @@ export default function ClientsPage() {
                           {c.nodeName}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 align-top whitespace-nowrap"><Badge variant={st.variant}>{st.label}</Badge></td>
                       <td className="px-4 py-3 align-top text-sm"><ActivityCell client={c} /></td>
                       <td className="px-4 py-3 align-top whitespace-nowrap text-sm">
                         <span className="text-emerald-400">↑ {formatBytes(c.bytesUp)}</span>
@@ -327,18 +322,14 @@ export default function ClientsPage() {
           {/* Mobile cards */}
           <div className="space-y-3 lg:hidden">
             {clients.map((c) => {
-              const st = getClientStatus(c.status);
               return (
                 <div key={c.id} className="space-y-3 rounded-lg border border-border bg-card p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`h-2 w-2 shrink-0 rounded-full ${c.online ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`} aria-label={c.online ? 'Online' : 'Offline'} />
-                        <span className="truncate font-medium text-foreground">{c.name}</span>
-                      </div>
-                      <div className="ml-4 truncate text-xs text-muted-foreground">by {c.createdByEmail ?? 'unknown'}</div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <ClientStatusDot status={c.status} />
+                      <span className="truncate font-medium text-foreground">{c.name}</span>
                     </div>
-                    <Badge variant={st.variant} className="shrink-0">{st.label}</Badge>
+                    <div className="ml-[18px] truncate text-xs text-muted-foreground">by {c.createdByEmail ?? 'unknown'}</div>
                   </div>
                   <ActivityCell client={c} />
                   <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">

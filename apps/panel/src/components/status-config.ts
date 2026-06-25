@@ -99,22 +99,22 @@ export const CLIENT_STATUS: Record<ClientStatus, StatusEntry> = {
     variant: 'warning',
     label: 'Disabled',
     icon: PauseCircle,
-    dot: 'bg-yellow-500',
-    text: 'text-yellow-400',
+    dot: 'bg-zinc-500',
+    text: 'text-zinc-400',
   },
   REVOKED: {
     variant: 'destructive',
     label: 'Revoked',
     icon: Ban,
-    dot: 'bg-destructive',
+    dot: 'bg-red-500',
     text: 'text-error',
   },
   EXPIRED: {
     variant: 'secondary',
     label: 'Expired',
     icon: Clock,
-    dot: 'bg-muted-foreground',
-    text: 'text-muted-foreground',
+    dot: 'bg-amber-500',
+    text: 'text-amber-400',
   },
 };
 

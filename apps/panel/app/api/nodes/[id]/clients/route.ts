@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { createClientSchema } from '@ovpn/api';
 import { generateFingerprint } from '@/lib/crypto';
 import { withAuth } from '@/lib/middleware';
-import { canAccessNode } from '@/lib/access';
+import { canAccessNode, clientOwnershipWhere } from '@/lib/access';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 import type { ClientStatus } from '@ovpn/types';
 
@@ -33,6 +33,8 @@ export const GET = withAuth(async (request: NextRequest, payload, { params }: { 
     const where = {
       nodeId,
       ...(status && VALID_CLIENT_STATUSES.includes(status) ? { status: status as ClientStatus } : {}),
+      // Managers see only the clients they created; full admins see all.
+      ...clientOwnershipWhere(payload),
     };
 
     const clients = await prisma.vpnClient.findMany({

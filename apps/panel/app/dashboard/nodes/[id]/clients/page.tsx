@@ -9,11 +9,9 @@ import { apiFetch, apiFetchRaw, UnauthorizedError } from '@/components/use-api';
 import { toast } from '@/components/ui/use-toast';
 import { confirm } from '@/components/ui/confirm-dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/spinner';
-import { getClientStatus } from '@/components/status-config';
-import { formatBytes, ActivityCell, ExpiryCell } from '@/components/client-ui';
+import { formatBytes, ActivityCell, ExpiryCell, ClientStatusDot } from '@/components/client-ui';
 
 interface Client {
   id: string;
@@ -267,20 +265,14 @@ export default function NodeClientsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {clients.map((client) => {
-                  const status = getClientStatus(client.status);
                   return (
                     <tr key={client.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-4 py-3 align-top">
                         <div className="flex items-center gap-2">
-                          <span
-                            className={`h-2 w-2 shrink-0 rounded-full ${client.online ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}
-                            title={client.online ? 'Online' : 'Offline'}
-                            aria-label={client.online ? 'Online' : 'Offline'}
-                          />
+                          <ClientStatusDot status={client.status} />
                           <span className="font-medium text-foreground">{client.name}</span>
-                          <Badge variant={status.variant} className="ml-1">{status.label}</Badge>
                         </div>
-                        <div className="ml-4 mt-0.5 truncate text-xs text-muted-foreground">
+                        <div className="ml-[18px] mt-0.5 truncate text-xs text-muted-foreground">
                           by {client.createdByEmail ?? 'unknown'}
                         </div>
                       </td>
@@ -308,23 +300,16 @@ export default function NodeClientsPage() {
           {/* Mobile / tablet (<lg): cards — no horizontal scroll, everything stacked. */}
           <div className="space-y-3 lg:hidden">
             {clients.map((client) => {
-              const status = getClientStatus(client.status);
               return (
                 <div key={client.id} className="space-y-3 rounded-lg border border-border bg-card p-4 text-card-foreground">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`h-2 w-2 shrink-0 rounded-full ${client.online ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}
-                          aria-label={client.online ? 'Online' : 'Offline'}
-                        />
-                        <span className="truncate font-medium text-foreground">{client.name}</span>
-                      </div>
-                      <div className="ml-4 truncate text-xs text-muted-foreground">
-                        by {client.createdByEmail ?? 'unknown'}
-                      </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <ClientStatusDot status={client.status} />
+                      <span className="truncate font-medium text-foreground">{client.name}</span>
                     </div>
-                    <Badge variant={status.variant} className="shrink-0">{status.label}</Badge>
+                    <div className="ml-[18px] truncate text-xs text-muted-foreground">
+                      by {client.createdByEmail ?? 'unknown'}
+                    </div>
                   </div>
 
                   <ActivityCell client={client} />

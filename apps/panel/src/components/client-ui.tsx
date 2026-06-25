@@ -1,7 +1,25 @@
 'use client';
 
+import { getClientStatus } from '@/components/status-config';
+
 // Shared presentation helpers for VPN clients, used by both the per-node clients
 // table and the global Clients view.
+
+/**
+ * Status as a colored dot (left of the client name): green = active,
+ * red = revoked, gray = disabled, amber = expired. Replaces the text badge.
+ */
+export function ClientStatusDot({ status }: { status: string }) {
+  const s = getClientStatus(status);
+  return (
+    <span
+      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${s.dot}`}
+      title={s.label}
+      aria-label={s.label}
+      role="img"
+    />
+  );
+}
 
 /** Human-readable bytes (1024-based): 0 B, 12.3 MB, 4.7 GB … */
 export function formatBytes(bytes: number): string {

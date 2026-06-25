@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/middleware';
-import { accessibleNodeIds } from '@/lib/access';
+import { accessibleNodeIds, clientOwnershipWhere } from '@/lib/access';
 
 const VALID_STATUS = ['ACTIVE', 'DISABLED', 'REVOKED', 'EXPIRED'];
 
@@ -31,10 +31,13 @@ export const GET = withAuth(async (request: NextRequest, payload) => {
       scope.nodeId = nodeIdParam;
     }
 
-    const where: any = { ...scope };
+    // Managers see only clients they created; full admins see all.
+    const ownership = clientOwnershipWhere(payload);
+
+    const where: any = { ...scope, ...ownership };
     if (search) where.name = { contains: search, mode: 'insensitive' };
     if (statusParam && VALID_STATUS.includes(statusParam)) where.status = statusParam;
-    if (createdByParam) where.createdById = createdByParam;
+    if (createdByParam && !ownership.createdById) where.createdById = createdByParam;
 
     const [clients, total, creators] = await Promise.all([
       prisma.vpnClient.findMany({
@@ -50,7 +53,7 @@ export const GET = withAuth(async (request: NextRequest, payload) => {
       }),
       prisma.vpnClient.count({ where }),
       prisma.admin.findMany({
-        where: { createdClients: { some: scope } },
+        where: { createdClients: { some: { ...scope, ...ownership } } },
         select: { id: true, email: true },
         orderBy: { email: 'asc' },
       }),

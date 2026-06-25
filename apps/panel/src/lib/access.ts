@@ -32,8 +32,17 @@ export async function canAccessNode(payload: AuthPayload, nodeId: string): Promi
 }
 
 /**
- * Resolve the node a client belongs to and check access. `exists` distinguishes
- * "client not found" (→ 404) from "found but forbidden" (→ 403).
+ * A Prisma `where` fragment restricting clients to those a manager created.
+ * Full admins get `{}` (all clients). Spread into client list/count queries.
+ */
+export function clientOwnershipWhere(payload: AuthPayload): { createdById?: string } {
+  return isFullAdmin(payload) ? {} : { createdById: payload.sub };
+}
+
+/**
+ * Resolve a client and check access. Full admins may access any client; a
+ * MANAGER may only access clients THEY created. `exists` distinguishes
+ * "not found" (→ 404) from "found but forbidden".
  */
 export async function checkClientAccess(
   payload: AuthPayload,
@@ -41,10 +50,10 @@ export async function checkClientAccess(
 ): Promise<{ exists: boolean; allowed: boolean; nodeId?: string }> {
   const client = await prisma.vpnClient.findUnique({
     where: { id: clientId },
-    select: { nodeId: true },
+    select: { nodeId: true, createdById: true },
   });
   if (!client) return { exists: false, allowed: false };
-  const allowed = await canAccessNode(payload, client.nodeId);
+  const allowed = isFullAdmin(payload) ? true : client.createdById === payload.sub;
   return { exists: true, allowed, nodeId: client.nodeId };
 }
 
