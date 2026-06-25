@@ -116,7 +116,7 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
       ? new Date(Date.now() + input.expiresIn * 24 * 60 * 60 * 1000)
       : null;
 
-    // Create client record
+    // Create client record (track who created it — admin or manager)
     const client = await prisma.vpnClient.create({
       data: {
         nodeId,
@@ -124,6 +124,7 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
         status: 'ACTIVE',
         fingerprint: generateFingerprint(),
         expiresAt,
+        createdById: payload.sub,
       },
     });
 

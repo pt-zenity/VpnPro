@@ -22,8 +22,9 @@ model Admin {
   createdAt   DateTime   @default(now())
   lastLoginAt DateTime?
 
-  auditLogs    AuditLog[]
-  managedNodes ManagerNode[] // nodes a MANAGER is assigned to (empty for full admins)
+  auditLogs      AuditLog[]
+  managedNodes   ManagerNode[] // nodes a MANAGER is assigned to (empty for full admins)
+  createdClients VpnClient[]   @relation("ClientCreator")
 
   @@index([email])
 }
@@ -148,14 +149,20 @@ model VpnClient {
   realAddress    String?     // public IP the client connects from
   vpnAddress     String?     // assigned VPN IP (10.8.0.x)
 
+  // Who created this client (admin or manager). Null = created before tracking
+  // or the creator account was deleted.
+  createdById String?
+
   artifacts ClientArtifact[]
   auditLogs AuditLog[]
 
-  node Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  node      Node   @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  createdBy Admin? @relation("ClientCreator", fields: [createdById], references: [id])
 
   @@unique([nodeId, name])
   @@index([nodeId, status])
   @@index([fingerprint])
+  @@index([createdById])
 }
 
 enum ClientStatus {
