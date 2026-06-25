@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Plus, Power, PowerOff, Trash2, Download } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
-import { apiFetch, apiFetchRaw, UnauthorizedError } from '@/components/use-api';
+import { apiFetch, UnauthorizedError } from '@/components/use-api';
 import { toast } from '@/components/ui/use-toast';
-import { confirm } from '@/components/ui/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/error-state';
 import { LoadingState } from '@/components/ui/spinner';
 import { formatBytes, ActivityCell, ExpiryCell, ClientStatusDot } from '@/components/client-ui';
+import { useClientActions } from '@/components/use-client-actions';
 
 interface Client {
   id: string;
@@ -43,7 +43,6 @@ export default function NodeClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) {
@@ -79,138 +78,8 @@ export default function NodeClientsPage() {
     return () => clearInterval(t);
   }, [load]);
 
-  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const handleToggle = async (client: Client) => {
-    const enabling = client.status === 'DISABLED';
-    setBusyId(client.id);
-    try {
-      await apiFetch(`/api/clients/${client.id}/${enabling ? 'enable' : 'disable'}`, { method: 'POST' });
-      toast({
-        variant: 'success',
-        title: enabling ? 'Client enabled' : 'Client disabled',
-        description: client.name,
-      });
-      load();
-    } catch (err) {
-      if (err instanceof UnauthorizedError) {
-        router.push('/login');
-        return;
-      }
-      const message = err instanceof Error ? err.message : 'Action failed';
-      toast({ variant: 'destructive', title: enabling ? 'Failed to enable' : 'Failed to disable', description: message });
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleDelete = async (clientId: string, clientName: string) => {
-    const ok = await confirm({
-      title: `Delete "${clientName}" permanently?`,
-      description:
-        'The certificate is revoked on the node (its .ovpn can never reconnect) and the client is removed from the panel. This cannot be undone.',
-      confirmLabel: 'Delete permanently',
-      destructive: true,
-    });
-    if (!ok) return;
-
-    setBusyId(clientId);
-    try {
-      await apiFetch(`/api/clients/${clientId}`, { method: 'DELETE' });
-      toast({ variant: 'success', title: 'Client deleted', description: clientName });
-      load();
-    } catch (err) {
-      if (err instanceof UnauthorizedError) {
-        router.push('/login');
-        return;
-      }
-      const message = err instanceof Error ? err.message : 'Failed to delete client';
-      toast({ variant: 'destructive', title: 'Failed to delete client', description: message });
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleDownload = async (clientId: string, clientName: string) => {
-    setDownloadingId(clientId);
-    try {
-      const res = await apiFetchRaw(`/api/clients/${clientId}/download`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${clientName}.ovpn`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast({ variant: 'success', title: 'Config downloaded', description: `${clientName}.ovpn` });
-    } catch (err) {
-      if (err instanceof UnauthorizedError) {
-        router.push('/login');
-        return;
-      }
-      const message = err instanceof Error ? err.message : 'Failed to download config';
-      toast({ variant: 'destructive', title: 'Download failed', description: message });
-    } finally {
-      setDownloadingId(null);
-    }
-  };
-
-  // Row actions, shared by the desktop table (icon-only, compact) and the mobile
-  // cards (icon + label). One source of truth so behaviour can't drift.
-  const renderActions = (client: Client, iconOnly: boolean) => {
-    const canDownload = (client.status === 'ACTIVE' || client.status === 'DISABLED') && client.artifactCount > 0;
-    const canToggle = client.status === 'ACTIVE' || client.status === 'DISABLED';
-    const canDelete = client.status !== 'REVOKED';
-    const enabling = client.status === 'DISABLED';
-    return (
-      <>
-        {canDownload && (
-          <Button
-            variant="outline"
-            size={iconOnly ? 'icon' : 'sm'}
-            className={iconOnly ? '' : 'gap-1.5'}
-            onClick={() => handleDownload(client.id, client.name)}
-            disabled={downloadingId === client.id}
-            aria-label={`Download ${client.name}.ovpn`}
-            title="Download .ovpn config"
-          >
-            <Download className="h-4 w-4" />
-            {!iconOnly && (downloadingId === client.id ? 'Downloading…' : 'Download')}
-          </Button>
-        )}
-        {canToggle && (
-          <Button
-            variant="ghost"
-            size={iconOnly ? 'icon' : 'sm'}
-            className={iconOnly ? '' : 'gap-1.5'}
-            onClick={() => handleToggle(client)}
-            disabled={busyId === client.id}
-            aria-label={enabling ? `Enable ${client.name}` : `Disable ${client.name}`}
-            title={enabling ? 'Enable this client' : 'Temporarily block this client'}
-          >
-            {enabling ? <Power className="h-4 w-4 text-emerald-400" /> : <PowerOff className="h-4 w-4 text-yellow-400" />}
-            {!iconOnly && (enabling ? 'Enable' : 'Disable')}
-          </Button>
-        )}
-        {canDelete && (
-          <Button
-            variant="ghost"
-            size={iconOnly ? 'icon' : 'sm'}
-            className={`text-destructive hover:text-destructive hover:bg-destructive/10 ${iconOnly ? '' : 'gap-1.5'}`}
-            onClick={() => handleDelete(client.id, client.name)}
-            disabled={busyId === client.id}
-            aria-label={`Delete ${client.name}`}
-            title="Delete permanently"
-          >
-            <Trash2 className="h-4 w-4" />
-            {!iconOnly && 'Delete'}
-          </Button>
-        )}
-      </>
-    );
-  };
+  const { renderActions } = useClientActions(() => load(true));
 
   return (
     <div className="space-y-6">

@@ -455,33 +455,8 @@ export default function NodeDetailsPage() {
         </div>
       )}
 
-      {/* Managers get a simple, friendly summary instead of server metrics. */}
-      {!isFullAdmin && (
-        <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-semibold">
-                {node.status === 'HEALTHY' ? 'This server is online' : 'This server is not ready yet'}
-              </h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {node.status === 'HEALTHY'
-                  ? `${node.healthStatus?.details?.connectedClients ?? 0} of your clients connected right now. Create and manage VPN users below.`
-                  : 'Ask an administrator — clients can be added once the server is online.'}
-              </p>
-            </div>
-            {canAddClient && (
-              <Button asChild className="gap-2">
-                <Link href={`/dashboard/nodes/${nodeId}/clients/new`}>
-                  <Plus className="h-4 w-4" />
-                  Add Client
-                </Link>
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {isFullAdmin && node.healthStatus && node.status === 'HEALTHY' && (
+      {/* Live server load — useful to admins and managers alike. */}
+      {node.healthStatus && node.status === 'HEALTHY' && (
         <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
           <h3 className="text-lg font-semibold mb-4">Health Status</h3>
           {(() => {
@@ -505,7 +480,7 @@ export default function NodeDetailsPage() {
               </div>
             );
           })()}
-          {node.xorMask && (
+          {isFullAdmin && node.xorMask && (
             <div className="mt-4 pt-4 border-t border-border">
               <span className="text-sm text-muted-foreground">XOR Mask:</span>
               <code className="ml-2 text-xs">{node.xorMask}</code>

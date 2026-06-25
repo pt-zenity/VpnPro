@@ -3,11 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Plus, Power, PowerOff, Trash2, Download, Search, Server } from 'lucide-react';
+import { Plus, Search, Server } from 'lucide-react';
 
-import { apiFetch, apiFetchRaw, UnauthorizedError } from '@/components/use-api';
+import { apiFetch, UnauthorizedError } from '@/components/use-api';
 import { toast } from '@/components/ui/use-toast';
-import { confirm } from '@/components/ui/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +21,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { formatBytes, ActivityCell, ExpiryCell, ClientStatusDot } from '@/components/client-ui';
+import { useClientActions } from '@/components/use-client-actions';
 
 interface Client {
   id: string;
@@ -72,8 +72,6 @@ export default function ClientsPage() {
   const [nodes, setNodes] = useState<NodeLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -142,63 +140,7 @@ export default function ClientsPage() {
     return () => clearInterval(t);
   }, [load]);
 
-  const handleToggle = async (c: Client) => {
-    const enabling = c.status === 'DISABLED';
-    setBusyId(c.id);
-    try {
-      await apiFetch(`/api/clients/${c.id}/${enabling ? 'enable' : 'disable'}`, { method: 'POST' });
-      toast({ variant: 'success', title: enabling ? 'Client enabled' : 'Client disabled', description: c.name });
-      load(true);
-    } catch (err) {
-      if (err instanceof UnauthorizedError) return router.push('/login');
-      toast({ variant: 'destructive', title: 'Action failed', description: err instanceof Error ? err.message : 'Failed' });
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleDelete = async (c: Client) => {
-    const ok = await confirm({
-      title: `Delete "${c.name}" permanently?`,
-      description: 'The certificate is revoked on the node (its .ovpn can never reconnect) and the client is removed.',
-      confirmLabel: 'Delete permanently',
-      destructive: true,
-    });
-    if (!ok) return;
-    setBusyId(c.id);
-    try {
-      await apiFetch(`/api/clients/${c.id}`, { method: 'DELETE' });
-      toast({ variant: 'success', title: 'Client deleted', description: c.name });
-      load(true);
-    } catch (err) {
-      if (err instanceof UnauthorizedError) return router.push('/login');
-      toast({ variant: 'destructive', title: 'Delete failed', description: err instanceof Error ? err.message : 'Failed' });
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleDownload = async (c: Client) => {
-    setDownloadingId(c.id);
-    try {
-      const res = await apiFetchRaw(`/api/clients/${c.id}/download`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${c.name}.ovpn`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast({ variant: 'success', title: 'Config downloaded', description: `${c.name}.ovpn` });
-    } catch (err) {
-      if (err instanceof UnauthorizedError) return router.push('/login');
-      toast({ variant: 'destructive', title: 'Download failed', description: err instanceof Error ? err.message : 'Failed' });
-    } finally {
-      setDownloadingId(null);
-    }
-  };
+  const { renderActions } = useClientActions(() => load(true));
 
   const healthyNodes = nodes.filter((n) => n.status === 'HEALTHY');
 
@@ -228,35 +170,6 @@ export default function ClientsPage() {
     } finally {
       setAdding(false);
     }
-  };
-
-  const actions = (c: Client, iconOnly: boolean) => {
-    const canDownload = (c.status === 'ACTIVE' || c.status === 'DISABLED') && c.artifactCount > 0;
-    const canToggle = c.status === 'ACTIVE' || c.status === 'DISABLED';
-    const canDelete = c.status !== 'REVOKED';
-    const enabling = c.status === 'DISABLED';
-    return (
-      <>
-        {canDownload && (
-          <Button variant="outline" size={iconOnly ? 'icon' : 'sm'} className={iconOnly ? '' : 'gap-1.5'} onClick={() => handleDownload(c)} disabled={downloadingId === c.id} aria-label={`Download ${c.name}.ovpn`} title="Download .ovpn config">
-            <Download className="h-4 w-4" />
-            {!iconOnly && (downloadingId === c.id ? 'Downloading…' : 'Download')}
-          </Button>
-        )}
-        {canToggle && (
-          <Button variant="ghost" size={iconOnly ? 'icon' : 'sm'} className={iconOnly ? '' : 'gap-1.5'} onClick={() => handleToggle(c)} disabled={busyId === c.id} aria-label={enabling ? `Enable ${c.name}` : `Disable ${c.name}`} title={enabling ? 'Enable this client' : 'Temporarily block this client'}>
-            {enabling ? <Power className="h-4 w-4 text-emerald-400" /> : <PowerOff className="h-4 w-4 text-yellow-400" />}
-            {!iconOnly && (enabling ? 'Enable' : 'Disable')}
-          </Button>
-        )}
-        {canDelete && (
-          <Button variant="ghost" size={iconOnly ? 'icon' : 'sm'} className={`text-destructive hover:text-destructive hover:bg-destructive/10 ${iconOnly ? '' : 'gap-1.5'}`} onClick={() => handleDelete(c)} disabled={busyId === c.id} aria-label={`Delete ${c.name}`} title="Delete permanently">
-            <Trash2 className="h-4 w-4" />
-            {!iconOnly && 'Delete'}
-          </Button>
-        )}
-      </>
-    );
   };
 
   const onlineCount = clients.filter((c) => c.online).length;
@@ -372,7 +285,7 @@ export default function ClientsPage() {
                       </td>
                       <td className="px-4 py-3 align-top whitespace-nowrap text-sm"><ExpiryCell expiresAt={c.expiresAt} status={c.status} /></td>
                       <td className="px-4 py-3 align-top whitespace-nowrap text-right">
-                        <div className="flex justify-end gap-1">{actions(c, true)}</div>
+                        <div className="flex justify-end gap-1">{renderActions(c, true)}</div>
                       </td>
                     </tr>
                   );
@@ -408,7 +321,7 @@ export default function ClientsPage() {
                     <dt className="text-muted-foreground">Expires</dt>
                     <dd className="text-right"><ExpiryCell expiresAt={c.expiresAt} status={c.status} /></dd>
                   </dl>
-                  <div className="flex flex-wrap gap-2 border-t border-border/50 pt-3">{actions(c, false)}</div>
+                  <div className="flex flex-wrap gap-2 border-t border-border/50 pt-3">{renderActions(c, false)}</div>
                 </div>
               );
             })}
@@ -427,16 +340,15 @@ export default function ClientsPage() {
             <p className="text-sm text-muted-foreground">No online node is available to add a client to right now.</p>
           ) : (
             <form id="add-client-form" onSubmit={submitAdd} className="space-y-4">
-              {healthyNodes.length > 1 && (
-                <div className="space-y-2">
-                  <Label htmlFor="add-node">Node</Label>
-                  <select id="add-node" value={addNodeId} onChange={(e) => setAddNodeId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                    {healthyNodes.map((n) => (
-                      <option key={n.id} value={n.id}>{n.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="add-node">Node</Label>
+                <select id="add-node" value={addNodeId} onChange={(e) => setAddNodeId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  {healthyNodes.map((n) => (
+                    <option key={n.id} value={n.id}>{n.name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">The client is created on this server.</p>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="add-name">Client name</Label>
                 <Input id="add-name" value={addName} onChange={(e) => setAddName(e.target.value)} required pattern="^[a-zA-Z0-9._-]+$" placeholder="e.g. user1, laptop, iphone-john" />
