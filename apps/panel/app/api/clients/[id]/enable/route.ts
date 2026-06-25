@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/middleware';
+import { checkClientAccess } from '@/lib/access';
 
 type Params = Promise<{ id: string }>;
 
@@ -8,6 +9,10 @@ type Params = Promise<{ id: string }>;
 export const POST = withAuth(async (request: NextRequest, payload, { params }: { params: Params }) => {
   try {
     const { id } = await params;
+    const _acc = await checkClientAccess(payload, id);
+    if (!_acc.exists || !_acc.allowed) {
+      return NextResponse.json({ error: 'CLIENT_NOT_FOUND', message: 'Client not found' }, { status: 404 });
+    }
 
     const client = await prisma.vpnClient.findUnique({ where: { id }, include: { node: true } });
     if (!client) {

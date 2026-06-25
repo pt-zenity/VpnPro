@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { listAuditLogsSchema } from '@ovpn/api';
 import { withAuth } from '@/lib/middleware';
+import { accessibleNodeIds } from '@/lib/access';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 
 // GET /api/audit-logs - List audit logs
@@ -19,6 +20,13 @@ export const GET = withAuth(async (request: NextRequest, payload) => {
       where.createdAt = {};
       if (input.from) where.createdAt.gte = new Date(input.from);
       if (input.to) where.createdAt.lte = new Date(input.to);
+    }
+
+    // Managers only see audit entries for their assigned nodes.
+    const ids = await accessibleNodeIds(payload);
+    if (ids !== null) {
+      where.nodeId =
+        input.nodeId && ids.includes(input.nodeId) ? input.nodeId : { in: ids };
     }
 
     const [logs, total] = await Promise.all([

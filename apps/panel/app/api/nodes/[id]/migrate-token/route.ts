@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { withAuth } from '@/lib/middleware';
+import { withFullAdmin } from '@/lib/middleware';
 import crypto from 'crypto';
 
 type Params = Promise<{ id: string }>;
 
 // POST /api/nodes/:id/migrate-token
-export const POST = withAuth(async (request: NextRequest, payload, { params }: { params: Params }) => {
+export const POST = withFullAdmin(async (request: NextRequest, payload, { params }: { params: Params }) => {
   try {
     const { id } = await params;
 

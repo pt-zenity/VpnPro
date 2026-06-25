@@ -3,11 +3,12 @@ import { prisma } from '@/lib/prisma';
 import { createNodeSchema } from '@ovpn/api';
 import { createRegistrationToken, hashApiToken } from '@/lib/crypto';
 import { generateInstallCommand } from '@/lib/install';
-import { withAuth } from '@/lib/middleware';
+import { withAuth, withFullAdmin } from '@/lib/middleware';
+import { accessibleNodeIds } from '@/lib/access';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 import type { NodeStatus } from '@ovpn/types';
 
-// GET /api/nodes - List all nodes
+// GET /api/nodes - List nodes (managers see only their assigned nodes)
 async function GET_handler(request: NextRequest, payload: any) {
   try {
     const { searchParams } = new URL(request.url);
@@ -19,8 +20,12 @@ async function GET_handler(request: NextRequest, payload: any) {
     // Only filter by status when it's a valid NodeStatus — a bogus value must
     // not reach Prisma (which would throw → 500). Unknown values are ignored.
     const VALID_STATUSES = ['PENDING', 'PROVISIONING', 'HEALTHY', 'UNHEALTHY', 'ERROR'];
-    const where =
+    const where: { status?: NodeStatus; id?: { in: string[] } } =
       status && VALID_STATUSES.includes(status) ? { status: status as NodeStatus } : {};
+
+    // Managers only see nodes assigned to them.
+    const allowedIds = await accessibleNodeIds(payload);
+    if (allowedIds !== null) where.id = { in: allowedIds };
 
     const [nodes, total] = await Promise.all([
       prisma.node.findMany({
@@ -147,4 +152,5 @@ async function POST_handler(request: NextRequest, payload: any) {
   }
 }
 
-export const POST = withAuth(POST_handler);
+// Creating nodes is a full-admin action — managers cannot.
+export const POST = withFullAdmin(POST_handler);

@@ -1,4 +1,5 @@
 import { AppSidebar, MobileNav } from "@/components/app-sidebar";
+import { SessionProvider, type Role } from "@/components/session-context";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifyToken } from "@/lib/crypto";
@@ -20,12 +21,15 @@ export default async function DashboardLayout({
   }
 
   const userEmail = payload.email;
+  const role = payload.role as Role;
+  const isFullAdmin = role !== 'MANAGER';
 
   return (
+    <SessionProvider value={{ email: userEmail, role, isFullAdmin }}>
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Background solid effect handled by bg-background */}
 
-      <AppSidebar userEmail={userEmail} />
+      <AppSidebar userEmail={userEmail} role={role} />
 
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -33,7 +37,7 @@ export default async function DashboardLayout({
         <header className="glass h-16 border-b border-border/50">
           <div className="mx-auto flex h-full w-full max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-2">
-              <MobileNav userEmail={userEmail} />
+              <MobileNav userEmail={userEmail} role={role} />
               <div className="h-2 w-2 rounded-full bg-emerald-500 pulse-glow" />
               <span className="text-sm text-muted-foreground">System Status: <span className="text-emerald-400 font-medium">Operational</span></span>
             </div>
@@ -52,5 +56,6 @@ export default async function DashboardLayout({
         </main>
       </div>
     </div>
+    </SessionProvider>
   );
 }

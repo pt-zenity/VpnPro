@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Server, Trash2, Eye, Clock, Activity, Shield } from 'lucide-react';
 
 import { apiFetch, UnauthorizedError } from '@/components/use-api';
+import { useSession } from '@/components/session-context';
 import { getNodeStatus } from '@/components/status-config';
 import { LoadingState } from '@/components/ui/spinner';
 import { ErrorState } from '@/components/ui/error-state';
@@ -28,6 +29,7 @@ interface Node {
 
 export default function NodesPage() {
   const router = useRouter();
+  const { isFullAdmin } = useSession();
   const [nodes, setNodes] = useState<Node[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -112,12 +114,14 @@ export default function NodesPage() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Nodes</h1>
           <p className="text-muted-foreground mt-1">Manage your VPN infrastructure</p>
         </div>
-        <Button asChild size="lg" className="gap-2">
-          <Link href="/dashboard/nodes/new">
-            <Plus className="h-5 w-5" />
-            Add Node
-          </Link>
-        </Button>
+        {isFullAdmin && (
+          <Button asChild size="lg" className="gap-2">
+            <Link href="/dashboard/nodes/new">
+              <Plus className="h-5 w-5" />
+              Add Node
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* Stats Overview */}
@@ -188,14 +192,18 @@ export default function NodesPage() {
             </div>
             <h3 className="text-lg font-semibold mb-2">No nodes yet</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Get started by adding your first VPN node to the infrastructure.
+              {isFullAdmin
+                ? 'Get started by adding your first VPN node to the infrastructure.'
+                : 'No nodes have been assigned to you yet. Ask an administrator to assign one.'}
             </p>
-            <Button asChild>
-              <Link href="/dashboard/nodes/new">
-                <Plus className="h-4 w-4" />
-                Add Your First Node
-              </Link>
-            </Button>
+            {isFullAdmin && (
+              <Button asChild>
+                <Link href="/dashboard/nodes/new">
+                  <Plus className="h-4 w-4" />
+                  Add Your First Node
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -244,15 +252,17 @@ export default function NodesPage() {
                         View
                       </Link>
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Delete node ${node.name}`}
-                      onClick={() => handleDelete(node.id, node.name)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {isFullAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete node ${node.name}`}
+                        onClick={() => handleDelete(node.id, node.name)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

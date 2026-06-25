@@ -7,6 +7,7 @@ import { Copy, Plus, Trash2, MoveRight } from 'lucide-react';
 
 import { InstallNodeDialog } from './InstallNodeDialog';
 import { apiFetch, ApiError, UnauthorizedError } from '@/components/use-api';
+import { useSession } from '@/components/session-context';
 import { copyToClipboard } from '@/lib/utils';
 import { toast } from '@/components/ui/use-toast';
 import { confirm } from '@/components/ui/confirm-dialog';
@@ -82,6 +83,7 @@ const OBFUSCATION_LABELS: Record<string, string> = {
 export default function NodeDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const { isFullAdmin } = useSession();
   const nodeId = typeof params.id === 'string' ? params.id : '';
 
   const [node, setNode] = useState<NodeDetails | null>(null);
@@ -285,9 +287,10 @@ export default function NodeDetailsPage() {
   const isInstalled = node.status === 'HEALTHY' || !!node.installedAt;
   const agentConnected =
     !!node.lastHeartbeatAt && Date.now() - new Date(node.lastHeartbeatAt).getTime() < 5 * 60 * 1000;
-  const canInstall = !isInstalled;
+  // Node lifecycle (install/reconfigure/migrate/delete) is full-admin only.
+  const canInstall = !isInstalled && isFullAdmin;
   // Reconfigure applies new options to an already-installed node (fast path).
-  const canReconfigure = isInstalled && agentConnected;
+  const canReconfigure = isInstalled && agentConnected && isFullAdmin;
   // A node that's connected and not installed, with no install running yet.
   const awaitingInstall = !isInstalled && !installActive;
   const canAddClient = node.status === 'HEALTHY';
@@ -491,19 +494,23 @@ export default function NodeDetailsPage() {
           <Button asChild variant="secondary">
             <Link href={`/dashboard/jobs?nodeId=${nodeId}`}>View Jobs</Link>
           </Button>
-          <Button variant="destructive" onClick={handleDelete} className="gap-2">
-            <Trash2 className="h-4 w-4" />
-            Delete Node
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleMigrate}
-            className="gap-2 ml-auto border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
-            title="Move this node and its clients to a new physical server"
-          >
-            <MoveRight className="h-4 w-4" />
-            Migrate Server
-          </Button>
+          {isFullAdmin && (
+            <>
+              <Button variant="destructive" onClick={handleDelete} className="gap-2">
+                <Trash2 className="h-4 w-4" />
+                Delete Node
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleMigrate}
+                className="gap-2 ml-auto border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                title="Move this node and its clients to a new physical server"
+              >
+                <MoveRight className="h-4 w-4" />
+                Migrate Server
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

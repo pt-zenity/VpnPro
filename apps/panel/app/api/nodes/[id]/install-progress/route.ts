@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/middleware';
+import { canAccessNode } from '@/lib/access';
 
 type Params = Promise<{ id: string }>;
 
-// GET /api/nodes/:id/install-progress — latest NODE_INSTALL job progress (auth-gated).
-export const GET = withAuth(async (_request: NextRequest, _payload, { params }: { params: Params }) => {
+// GET /api/nodes/:id/install-progress — latest NODE_INSTALL job progress (auth-gated, scoped).
+export const GET = withAuth(async (_request: NextRequest, payload, { params }: { params: Params }) => {
   try {
     const { id } = await params;
+    if (!(await canAccessNode(payload, id))) {
+      return NextResponse.json({ error: 'NODE_NOT_FOUND', message: 'Node not found' }, { status: 404 });
+    }
 
     const job = await prisma.job.findFirst({
       where: { nodeId: id, type: 'NODE_INSTALL' },

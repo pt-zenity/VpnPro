@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { installNodeSchema } from '@ovpn/api';
-import { withAuth } from '@/lib/middleware';
+import { withFullAdmin } from '@/lib/middleware';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 
 type Params = Promise<{ id: string }>;
 
 // POST /api/nodes/:id/install - Trigger OpenVPN installation
-export const POST = withAuth(async (request: NextRequest, payload, { params }: { params: Params }) => {
+export const POST = withFullAdmin(async (request: NextRequest, payload, { params }: { params: Params }) => {
   try {
     const { id } = await params;
     const body = await request.json();

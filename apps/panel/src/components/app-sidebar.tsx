@@ -8,6 +8,7 @@ import {
   Server,
   Briefcase,
   FileText,
+  Users,
   LogOut,
   Menu,
 } from "lucide-react";
@@ -16,15 +17,33 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Logo } from "@/components/ui/logo";
 
-const navigation = [
+type Role = "SUPERADMIN" | "ADMIN" | "MANAGER";
+
+const baseNav = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Nodes", href: "/dashboard/nodes", icon: Server },
   { name: "Jobs", href: "/dashboard/jobs", icon: Briefcase },
   { name: "Audit Logs", href: "/dashboard/audit", icon: FileText },
 ];
+// Full admins only.
+const adminNav = [{ name: "Managers", href: "/dashboard/managers", icon: Users }];
 
-function SidebarInner({ userEmail, onNavigate }: { userEmail?: string; onNavigate?: () => void }) {
+function navFor(role?: Role) {
+  return role && role !== "MANAGER" ? [...baseNav, ...adminNav] : baseNav;
+}
+
+function SidebarInner({
+  userEmail,
+  role,
+  onNavigate,
+}: {
+  userEmail?: string;
+  role?: Role;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
+  const navigation = navFor(role);
+  const roleLabel = role === "MANAGER" ? "Manager" : "Administrator";
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -70,7 +89,7 @@ function SidebarInner({ userEmail, onNavigate }: { userEmail?: string; onNavigat
             {userEmail ? userEmail[0] : "A"}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">Admin</p>
+            <p className="text-sm font-medium text-foreground truncate">{roleLabel}</p>
             <p className="text-xs text-muted-foreground truncate">{userEmail || "admin@example.com"}</p>
           </div>
         </div>
@@ -88,16 +107,16 @@ function SidebarInner({ userEmail, onNavigate }: { userEmail?: string; onNavigat
 }
 
 /** Desktop sidebar — hidden below the md breakpoint. */
-export function AppSidebar({ userEmail }: { userEmail?: string }) {
+export function AppSidebar({ userEmail, role }: { userEmail?: string; role?: Role }) {
   return (
     <aside className="hidden md:flex h-full w-64 flex-col glass border-r border-border/50">
-      <SidebarInner userEmail={userEmail} />
+      <SidebarInner userEmail={userEmail} role={role} />
     </aside>
   );
 }
 
 /** Mobile hamburger + slide-in nav drawer (focus-trapped via Radix Dialog). */
-export function MobileNav({ userEmail }: { userEmail?: string }) {
+export function MobileNav({ userEmail, role }: { userEmail?: string; role?: Role }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -113,7 +132,7 @@ export function MobileNav({ userEmail }: { userEmail?: string }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="left-0 top-0 h-full w-64 max-w-[80vw] translate-x-0 translate-y-0 gap-0 rounded-none border-y-0 border-l-0 border-r p-0 glass sm:rounded-none">
           <DialogTitle className="sr-only">Navigation menu</DialogTitle>
-          <SidebarInner userEmail={userEmail} onNavigate={() => setOpen(false)} />
+          <SidebarInner userEmail={userEmail} role={role} onNavigate={() => setOpen(false)} />
         </DialogContent>
       </Dialog>
     </div>

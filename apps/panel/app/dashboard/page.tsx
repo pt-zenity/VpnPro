@@ -9,6 +9,7 @@ import { Plus, Server, Users, Briefcase, ArrowRight, Activity, TrendingUp, Shiel
 import Link from 'next/link';
 
 import { apiFetch, UnauthorizedError } from '@/components/use-api';
+import { useSession } from '@/components/session-context';
 import { LoadingState } from '@/components/ui/spinner';
 import { ErrorState } from '@/components/ui/error-state';
 import { toast } from '@/components/ui/use-toast';
@@ -21,6 +22,7 @@ interface Stats {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { isFullAdmin } = useSession();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -211,17 +213,19 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
-            <Button asChild className="w-full h-auto py-4 group relative overflow-hidden" size="lg">
-              <Link href="/dashboard/nodes/new">
-                <div className="relative flex items-center gap-3">
-                  <Plus className="h-5 w-5" />
-                  <div className="text-left">
-                    <div className="font-medium">Add Node</div>
-                    <div className="text-xs text-primary-foreground/70">Register a new VPN node</div>
+            {isFullAdmin && (
+              <Button asChild className="w-full h-auto py-4 group relative overflow-hidden" size="lg">
+                <Link href="/dashboard/nodes/new">
+                  <div className="relative flex items-center gap-3">
+                    <Plus className="h-5 w-5" />
+                    <div className="text-left">
+                      <div className="font-medium">Add Node</div>
+                      <div className="text-xs text-primary-foreground/70">Register a new VPN node</div>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            </Button>
+                </Link>
+              </Button>
+            )}
 
             <Button asChild variant="outline" className="w-full h-auto py-4 group" size="lg">
               <Link href="/dashboard/nodes">

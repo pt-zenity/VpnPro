@@ -22,7 +22,8 @@ model Admin {
   createdAt   DateTime   @default(now())
   lastLoginAt DateTime?
 
-  auditLogs AuditLog[]
+  auditLogs    AuditLog[]
+  managedNodes ManagerNode[] // nodes a MANAGER is assigned to (empty for full admins)
 
   @@index([email])
 }
@@ -30,6 +31,23 @@ model Admin {
 enum AdminRole {
   SUPERADMIN
   ADMIN
+  MANAGER
+}
+
+// Assigns a MANAGER to a node (many-to-many). Full admins (SUPERADMIN/ADMIN)
+// implicitly have access to every node and do NOT get rows here.
+model ManagerNode {
+  id        String   @id @default(cuid())
+  adminId   String
+  nodeId    String
+  createdAt DateTime @default(now())
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  node  Node  @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@unique([adminId, nodeId])
+  @@index([adminId])
+  @@index([nodeId])
 }
 
 model NodeAuthToken {
@@ -88,6 +106,7 @@ model Node {
   jobs         Job[]
   healthChecks HealthCheck[]
   auditLogs    AuditLog[]
+  managers     ManagerNode[]
 
   @@index([status])
   @@index([apiToken])

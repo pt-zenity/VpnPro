@@ -44,6 +44,25 @@ export const loginSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 
 // ============================================================================
+// Manager (scoped admin) Validators
+// ============================================================================
+
+export const createManagerSchema = z.object({
+  email: z.string().email('Invalid email').max(254),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(128),
+  nodeIds: z.array(nodeIdSchema).max(500).optional().default([]),
+});
+
+export type CreateManagerInput = z.infer<typeof createManagerSchema>;
+
+export const updateManagerSchema = z.object({
+  nodeIds: z.array(nodeIdSchema).max(500).optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(128).optional(),
+});
+
+export type UpdateManagerInput = z.infer<typeof updateManagerSchema>;
+
+// ============================================================================
 // Node Validators
 // ============================================================================
 

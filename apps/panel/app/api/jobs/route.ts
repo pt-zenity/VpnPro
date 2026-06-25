@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { listJobsSchema } from '@ovpn/api';
 import { withAuth } from '@/lib/middleware';
+import { accessibleNodeIds } from '@/lib/access';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 
-// GET /api/jobs - List jobs
+// GET /api/jobs - List jobs (scoped to a manager's nodes)
 export const GET = withAuth(async (request: NextRequest, payload) => {
   try {
     const { searchParams } = new URL(request.url);
@@ -14,6 +15,14 @@ export const GET = withAuth(async (request: NextRequest, payload) => {
     if (input.nodeId) where.nodeId = input.nodeId;
     if (input.type) where.type = input.type;
     if (input.status) where.status = input.status;
+
+    // Managers only see jobs for their assigned nodes.
+    const ids = await accessibleNodeIds(payload);
+    if (ids !== null) {
+      where.nodeId = input.nodeId
+        ? (ids.includes(input.nodeId) ? input.nodeId : { in: [] })
+        : { in: ids };
+    }
 
     const [jobs, total] = await Promise.all([
       prisma.job.findMany({

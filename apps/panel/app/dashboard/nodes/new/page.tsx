@@ -9,12 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Copy, Check, Terminal, Shield, ArrowLeft, Plus } from 'lucide-react';
 import { apiFetch, UnauthorizedError } from '@/components/use-api';
+import { useSession } from '@/components/session-context';
 import { toast } from '@/components/ui/use-toast';
 import { Spinner } from '@/components/ui/spinner';
+import { ErrorState } from '@/components/ui/error-state';
 import { copyToClipboard } from '@/lib/utils';
 
 export default function NewNodePage() {
   const router = useRouter();
+  const { isFullAdmin } = useSession();
   const [name, setName] = useState('');
   const [host, setHost] = useState('');
   const [port, setPort] = useState('22');
@@ -72,6 +75,17 @@ export default function NewNodePage() {
     toast({ variant: 'success', title: 'Install command copied' });
     setTimeout(() => setCopiedCommand(false), 2000);
   };
+
+  // Creating nodes is full-admin only.
+  if (!isFullAdmin) {
+    return (
+      <ErrorState
+        title="Administrators only"
+        message="Only an administrator can register new nodes."
+        onRetry={() => router.push('/dashboard/nodes')}
+      />
+    );
+  }
 
   if (result) {
     return (

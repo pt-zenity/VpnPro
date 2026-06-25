@@ -2,10 +2,19 @@ import { NextRequest } from 'next/server';
 import { verifyToken } from './crypto';
 import { cookies } from 'next/headers';
 
+export type AdminRole = 'SUPERADMIN' | 'ADMIN' | 'MANAGER';
+
+/** SUPERADMIN and ADMIN have full access; MANAGER is scoped to assigned nodes. */
+export const FULL_ADMIN_ROLES: AdminRole[] = ['SUPERADMIN', 'ADMIN'];
+
 export interface AuthPayload {
   sub: string;
   email: string;
-  role: 'SUPERADMIN' | 'ADMIN';
+  role: AdminRole;
+}
+
+export function isValidRole(role: unknown): role is AdminRole {
+  return role === 'SUPERADMIN' || role === 'ADMIN' || role === 'MANAGER';
 }
 
 /** Name of the session cookie that carries the JWT. */
@@ -56,7 +65,7 @@ export async function authenticateRequest(request: NextRequest): Promise<AuthPay
   if (!payload) return null;
 
   // Validate role is one of the expected values
-  if (payload.role !== 'SUPERADMIN' && payload.role !== 'ADMIN') {
+  if (!isValidRole(payload.role)) {
     return null;
   }
 
@@ -76,7 +85,7 @@ export async function requireAuth(request: NextRequest): Promise<AuthPayload> {
   }
 
   // Validate role
-  if (payload.role !== 'SUPERADMIN' && payload.role !== 'ADMIN') {
+  if (!isValidRole(payload.role)) {
     throw new Error('UNAUTHORIZED');
   }
 

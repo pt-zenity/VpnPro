@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateNodeSchema } from '@ovpn/api';
-import { withAuth } from '@/lib/middleware';
+import { withAuth, withFullAdmin } from '@/lib/middleware';
+import { canAccessNode } from '@/lib/access';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 
 type Params = Promise<{ id: string }>;
 
-// GET /api/nodes/:id - Get node details
+// GET /api/nodes/:id - Get node details (scoped to assigned nodes for managers)
 export const GET = withAuth(async (request: NextRequest, payload, { params }: { params: Params }) => {
   try {
     const { id } = await params;
+
+    // Hide nodes a manager isn't assigned to (same 404 as a missing node — no
+    // existence leak via enumeration).
+    if (!(await canAccessNode(payload, id))) {
+      return NextResponse.json({ error: 'NODE_NOT_FOUND', message: 'Node not found' }, { status: 404 });
+    }
 
     const node = await prisma.node.findUnique({
       where: { id },
@@ -75,7 +82,7 @@ export const GET = withAuth(async (request: NextRequest, payload, { params }: { 
 });
 
 // PATCH /api/nodes/:id - Update node
-export const PATCH = withAuth(async (request: NextRequest, payload, { params }: { params: Params }) => {
+export const PATCH = withFullAdmin(async (request: NextRequest, payload, { params }: { params: Params }) => {
   try {
     const { id } = await params;
     const body = await request.json();
@@ -120,7 +127,7 @@ export const PATCH = withAuth(async (request: NextRequest, payload, { params }: 
 });
 
 // DELETE /api/nodes/:id - Delete node
-export const DELETE = withAuth(async (request: NextRequest, payload, { params }: { params: Params }) => {
+export const DELETE = withFullAdmin(async (request: NextRequest, payload, { params }: { params: Params }) => {
   try {
     const { id } = await params;
 

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/middleware';
+import { canAccessNode } from '@/lib/access';
 
 type Params = Promise<{ id: string }>;
 
-// GET /api/jobs/:id - Get job details
+// GET /api/jobs/:id - Get job details (scoped to a manager's nodes)
 export const GET = withAuth(async (request: NextRequest, payload, { params }: { params: Params }) => {
   try {
     const { id } = await params;
@@ -18,7 +19,7 @@ export const GET = withAuth(async (request: NextRequest, payload, { params }: { 
       },
     });
 
-    if (!job) {
+    if (!job || !(await canAccessNode(payload, job.nodeId))) {
       return NextResponse.json(
         { error: 'JOB_NOT_FOUND', message: 'Job not found' },
         { status: 404 },
@@ -60,7 +61,7 @@ export const DELETE = withAuth(async (request: NextRequest, payload, { params }:
       where: { id },
     });
 
-    if (!job) {
+    if (!job || !(await canAccessNode(payload, job.nodeId))) {
       return NextResponse.json(
         { error: 'JOB_NOT_FOUND', message: 'Job not found' },
         { status: 404 },

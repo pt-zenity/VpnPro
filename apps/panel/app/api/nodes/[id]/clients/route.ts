@@ -3,17 +3,22 @@ import { prisma } from '@/lib/prisma';
 import { createClientSchema } from '@ovpn/api';
 import { generateFingerprint } from '@/lib/crypto';
 import { withAuth } from '@/lib/middleware';
+import { canAccessNode } from '@/lib/access';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 import type { ClientStatus } from '@ovpn/types';
 
 type Params = Promise<{ id: string }>;
 
-// GET /api/nodes/:id/clients - List clients for a node
+// GET /api/nodes/:id/clients - List clients for a node (scoped for managers)
 export const GET = withAuth(async (request: NextRequest, payload, { params }: { params: Params }) => {
   try {
     const { id: nodeId } = await params;
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
+
+    if (!(await canAccessNode(payload, nodeId))) {
+      return NextResponse.json({ error: 'NODE_NOT_FOUND', message: 'Node not found' }, { status: 404 });
+    }
 
     const node = await prisma.node.findUnique({ where: { id: nodeId } });
     if (!node) {
@@ -68,12 +73,16 @@ export const GET = withAuth(async (request: NextRequest, payload, { params }: { 
   }
 });
 
-// POST /api/nodes/:id/clients - Create new client
+// POST /api/nodes/:id/clients - Create new client (managers: only on assigned nodes)
 export const POST = withAuth(async (request: NextRequest, payload, { params }: { params: Params }) => {
   try {
     const { id: nodeId } = await params;
     const body = await request.json();
     const input = createClientSchema.parse(body);
+
+    if (!(await canAccessNode(payload, nodeId))) {
+      return NextResponse.json({ error: 'NODE_NOT_FOUND', message: 'Node not found' }, { status: 404 });
+    }
 
     const node = await prisma.node.findUnique({ where: { id: nodeId } });
     if (!node) {
