@@ -3,15 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Power, PowerOff, Trash2, Download, Search, Server } from 'lucide-react';
+import { Plus, Power, PowerOff, Trash2, Download, Search, Server } from 'lucide-react';
 
 import { apiFetch, apiFetchRaw, UnauthorizedError } from '@/components/use-api';
 import { toast } from '@/components/ui/use-toast';
 import { confirm } from '@/components/ui/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { ErrorState } from '@/components/ui/error-state';
-import { LoadingState } from '@/components/ui/spinner';
+import { LoadingState, Spinner } from '@/components/ui/spinner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { formatBytes, ActivityCell, ExpiryCell, ClientStatusDot } from '@/components/client-ui';
 
 interface Client {
@@ -40,7 +49,17 @@ interface Creator {
 interface NodeLite {
   id: string;
   name: string;
+  status?: string;
 }
+
+const EXPIRY_OPTIONS = [
+  { value: '30', label: '1 month' },
+  { value: '90', label: '3 months' },
+  { value: '180', label: '6 months' },
+  { value: '365', label: '1 year' },
+  { value: '730', label: '2 years' },
+  { value: 'never', label: 'Never' },
+] as const;
 
 const TH = 'px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase';
 const SELECT = 'h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring';
@@ -61,6 +80,13 @@ export default function ClientsPage() {
   const [nodeId, setNodeId] = useState('');
   const [status, setStatus] = useState('');
   const [createdById, setCreatedById] = useState('');
+
+  // Add-client dialog
+  const [showAdd, setShowAdd] = useState(false);
+  const [addNodeId, setAddNodeId] = useState('');
+  const [addName, setAddName] = useState('');
+  const [addExpiry, setAddExpiry] = useState('365');
+  const [adding, setAdding] = useState(false);
 
   const load = useCallback(
     async (silent = false) => {
@@ -174,6 +200,36 @@ export default function ClientsPage() {
     }
   };
 
+  const healthyNodes = nodes.filter((n) => n.status === 'HEALTHY');
+
+  const openAdd = () => {
+    setAddName('');
+    setAddExpiry('365');
+    setAddNodeId(healthyNodes[0]?.id ?? '');
+    setShowAdd(true);
+  };
+
+  const submitAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addNodeId) return;
+    setAdding(true);
+    try {
+      await apiFetch(`/api/nodes/${addNodeId}/clients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: addName, expiresIn: addExpiry === 'never' ? undefined : parseInt(addExpiry, 10) }),
+      });
+      toast({ variant: 'success', title: 'Client created', description: `${addName} — the .ovpn will be ready in a moment.` });
+      setShowAdd(false);
+      load(true);
+    } catch (err) {
+      if (err instanceof UnauthorizedError) return router.push('/login');
+      toast({ variant: 'destructive', title: 'Create failed', description: err instanceof Error ? err.message : 'Failed' });
+    } finally {
+      setAdding(false);
+    }
+  };
+
   const actions = (c: Client, iconOnly: boolean) => {
     const canDownload = (c.status === 'ACTIVE' || c.status === 'DISABLED') && c.artifactCount > 0;
     const canToggle = c.status === 'ACTIVE' || c.status === 'DISABLED';
@@ -208,19 +264,25 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Clients</h1>
-        <p className="text-muted-foreground mt-1">
-          All VPN clients across your nodes
-          {clients.length > 0 && (
-            <>
-              {' · '}
-              <span className="text-emerald-400 font-medium">{onlineCount} online</span>
-              {' / '}
-              {clients.length} shown
-            </>
-          )}
-        </p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Clients</h1>
+          <p className="text-muted-foreground mt-1">
+            All VPN clients across your nodes
+            {clients.length > 0 && (
+              <>
+                {' · '}
+                <span className="text-emerald-400 font-medium">{onlineCount} online</span>
+                {' / '}
+                {clients.length} shown
+              </>
+            )}
+          </p>
+        </div>
+        <Button className="gap-2" onClick={openAdd} disabled={nodes.length === 0}>
+          <Plus className="h-4 w-4" />
+          Add Client
+        </Button>
       </div>
 
       {/* Filters */}
@@ -353,6 +415,58 @@ export default function ClientsPage() {
           </div>
         </>
       )}
+
+      {/* Create a client in one step — pick the node, name, and validity. */}
+      <Dialog open={showAdd} onOpenChange={(o) => { if (!o && !adding) setShowAdd(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add client</DialogTitle>
+            <DialogDescription>Create a new VPN user. The .ovpn becomes downloadable once the node issues the certificate.</DialogDescription>
+          </DialogHeader>
+          {healthyNodes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No online node is available to add a client to right now.</p>
+          ) : (
+            <form id="add-client-form" onSubmit={submitAdd} className="space-y-4">
+              {healthyNodes.length > 1 && (
+                <div className="space-y-2">
+                  <Label htmlFor="add-node">Node</Label>
+                  <select id="add-node" value={addNodeId} onChange={(e) => setAddNodeId(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                    {healthyNodes.map((n) => (
+                      <option key={n.id} value={n.id}>{n.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="add-name">Client name</Label>
+                <Input id="add-name" value={addName} onChange={(e) => setAddName(e.target.value)} required pattern="^[a-zA-Z0-9._-]+$" placeholder="e.g. user1, laptop, iphone-john" />
+                <p className="text-xs text-muted-foreground">Letters, numbers, dots, underscores, hyphens.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="add-expiry">Expires in</Label>
+                <select id="add-expiry" value={addExpiry} onChange={(e) => setAddExpiry(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                  {EXPIRY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+                {addExpiry !== 'never' && (
+                  <p className="text-xs text-muted-foreground">
+                    Valid until {new Date(Date.now() + parseInt(addExpiry, 10) * 86400000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}.
+                  </p>
+                )}
+              </div>
+            </form>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowAdd(false)} disabled={adding}>Cancel</Button>
+            {healthyNodes.length > 0 && (
+              <Button form="add-client-form" type="submit" disabled={adding || !addNodeId} className="gap-2">
+                {adding ? (<><Spinner className="h-4 w-4" />Creating…</>) : 'Create client'}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

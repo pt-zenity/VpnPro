@@ -388,7 +388,7 @@ export default function NodeDetailsPage() {
         </div>
       </div>
 
-      {installActive && (
+      {isFullAdmin && installActive && (
         <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-semibold text-lg">Installing OpenVPN</h3>
@@ -407,7 +407,7 @@ export default function NodeDetailsPage() {
         </div>
       )}
 
-      {awaitingInstall && (
+      {isFullAdmin && awaitingInstall && (
         <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
           <h3 className="font-semibold text-lg mb-1">
             {agentConnected ? 'Agent connected — ready to install' : 'Waiting for the agent to connect…'}
@@ -420,6 +420,8 @@ export default function NodeDetailsPage() {
         </div>
       )}
 
+      {/* Server internals — only useful to full admins; managers just manage clients. */}
+      {isFullAdmin && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <DetailCard label="Host / IP" value={node.host} />
         <DetailCard label="Agent Version" value={node.version || '-'} />
@@ -428,8 +430,9 @@ export default function NodeDetailsPage() {
         <DetailCard label="Last Heartbeat" value={node.lastHeartbeatAt ? new Date(node.lastHeartbeatAt).toLocaleString() : 'Never'} />
         <DetailCard label="Created" value={new Date(node.createdAt).toLocaleString()} />
       </div>
+      )}
 
-      {(isInstalled || node.status === 'PROVISIONING') && node.obfuscation && (
+      {isFullAdmin && (isInstalled || node.status === 'PROVISIONING') && node.obfuscation && (
         <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Server Configuration</h3>
@@ -452,7 +455,33 @@ export default function NodeDetailsPage() {
         </div>
       )}
 
-      {node.healthStatus && node.status === 'HEALTHY' && (
+      {/* Managers get a simple, friendly summary instead of server metrics. */}
+      {!isFullAdmin && (
+        <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-semibold">
+                {node.status === 'HEALTHY' ? 'This server is online' : 'This server is not ready yet'}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {node.status === 'HEALTHY'
+                  ? `${node.healthStatus?.details?.connectedClients ?? 0} of your clients connected right now. Create and manage VPN users below.`
+                  : 'Ask an administrator — clients can be added once the server is online.'}
+              </p>
+            </div>
+            {canAddClient && (
+              <Button asChild className="gap-2">
+                <Link href={`/dashboard/nodes/${nodeId}/clients/new`}>
+                  <Plus className="h-4 w-4" />
+                  Add Client
+                </Link>
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isFullAdmin && node.healthStatus && node.status === 'HEALTHY' && (
         <div className="bg-card text-card-foreground border border-border rounded-lg p-6">
           <h3 className="text-lg font-semibold mb-4">Health Status</h3>
           {(() => {

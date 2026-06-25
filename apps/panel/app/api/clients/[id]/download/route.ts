@@ -70,6 +70,7 @@ export const GET = withAuth(async (request: NextRequest, payload, { params }: { 
     await prisma.auditLog.create({
       data: {
         action: 'client.downloaded',
+        adminId: payload.sub,
         nodeId: client.nodeId,
         clientId: client.id,
         details: { clientName: client.name },

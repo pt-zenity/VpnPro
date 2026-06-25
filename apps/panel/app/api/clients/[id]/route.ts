@@ -92,6 +92,7 @@ export const DELETE = withAuth(async (request: NextRequest, payload, { params }:
       await prisma.job.create({
         data: {
           type: 'CLIENT_REVOKE',
+          triggeredById: payload.sub,
           status: 'PENDING',
           priority: 8,
           nodeId: client.nodeId,
@@ -106,6 +107,7 @@ export const DELETE = withAuth(async (request: NextRequest, payload, { params }:
     await prisma.auditLog.create({
       data: {
         action: 'client.deleted',
+        adminId: payload.sub,
         nodeId: client.nodeId,
         clientId: client.id,
         details: { clientName: client.name },

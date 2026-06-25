@@ -59,6 +59,7 @@ export const POST = withFullAdmin(async (request: NextRequest, payload, { params
     const job = await prisma.job.create({
       data: {
         type: 'NODE_INSTALL',
+        triggeredById: payload.sub,
         status: 'PENDING',
         priority: 10,
         nodeId: node.id,

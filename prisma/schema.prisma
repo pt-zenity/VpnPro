@@ -212,6 +212,10 @@ model Job {
   result     Json?
   error      String?
 
+  // Who triggered this job (admin/manager). Null = system/agent or pre-tracking.
+  // Lets a manager see only the jobs they caused.
+  triggeredById String?
+
   progress        Int?     @default(0)
   progressMessage String?
 
@@ -227,6 +231,7 @@ model Job {
 
   @@index([nodeId, status])
   @@index([type, status])
+  @@index([triggeredById])
   @@index([createdAt])
 }
 

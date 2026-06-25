@@ -227,13 +227,26 @@ export default function DashboardPage() {
               </Button>
             )}
 
+            {/* Managers can't add nodes, so make client management their primary action. */}
+            <Button asChild variant={isFullAdmin ? 'outline' : 'default'} className="w-full h-auto py-4 group" size="lg">
+              <Link href="/dashboard/clients">
+                <div className="flex items-center gap-3">
+                  <Users className="h-5 w-5" />
+                  <div className="text-left">
+                    <div className="font-medium">Manage Clients</div>
+                    <div className={`text-xs ${isFullAdmin ? 'text-muted-foreground' : 'text-primary-foreground/70'}`}>Create and manage VPN users</div>
+                  </div>
+                </div>
+              </Link>
+            </Button>
+
             <Button asChild variant="outline" className="w-full h-auto py-4 group" size="lg">
               <Link href="/dashboard/nodes">
                 <div className="flex items-center gap-3">
                   <Server className="h-5 w-5" />
                   <div className="text-left">
                     <div className="font-medium">View Nodes</div>
-                    <div className="text-xs text-muted-foreground">Manage all nodes</div>
+                    <div className="text-xs text-muted-foreground">{isFullAdmin ? 'Manage all nodes' : 'Your assigned nodes'}</div>
                   </div>
                 </div>
               </Link>

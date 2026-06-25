@@ -22,11 +22,10 @@ export const GET = withAuth(async (request: NextRequest, payload) => {
       if (input.to) where.createdAt.lte = new Date(input.to);
     }
 
-    // Managers only see audit entries for their assigned nodes.
+    // Managers only see their own actions in the audit log; admins see all.
     const ids = await accessibleNodeIds(payload);
     if (ids !== null) {
-      where.nodeId =
-        input.nodeId && ids.includes(input.nodeId) ? input.nodeId : { in: ids };
+      where.adminId = payload.sub;
     }
 
     const [logs, total] = await Promise.all([

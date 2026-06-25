@@ -16,12 +16,12 @@ export const GET = withAuth(async (request: NextRequest, payload) => {
     if (input.type) where.type = input.type;
     if (input.status) where.status = input.status;
 
-    // Managers only see jobs for their assigned nodes.
+    // Managers only see jobs they triggered themselves; admins see all.
     const ids = await accessibleNodeIds(payload);
     if (ids !== null) {
-      where.nodeId = input.nodeId
-        ? (ids.includes(input.nodeId) ? input.nodeId : { in: [] })
-        : { in: ids };
+      where.triggeredById = payload.sub;
+      // If they also filtered by a node they can't access, return nothing.
+      if (input.nodeId && !ids.includes(input.nodeId)) where.nodeId = { in: [] };
     }
 
     const [jobs, total] = await Promise.all([

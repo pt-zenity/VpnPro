@@ -136,6 +136,7 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
     const job = await prisma.job.create({
       data: {
         type: 'CLIENT_CREATE',
+        triggeredById: payload.sub,
         status: 'PENDING',
         priority: 5,
         nodeId,
@@ -157,6 +158,7 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
     await prisma.auditLog.create({
       data: {
         action: 'client.created',
+        adminId: payload.sub,
         nodeId,
         clientId: client.id,
         details: { clientName: input.name },

@@ -35,6 +35,7 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
     const job = await prisma.job.create({
       data: {
         type: 'CLIENT_ENABLE',
+        triggeredById: payload.sub,
         status: 'PENDING',
         priority: 8,
         nodeId: client.nodeId,
@@ -51,6 +52,7 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
     await prisma.auditLog.create({
       data: {
         action: 'client.enabled',
+        adminId: payload.sub,
         nodeId: client.nodeId,
         clientId: client.id,
         details: { clientName: client.name },
