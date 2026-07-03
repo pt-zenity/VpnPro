@@ -9,3 +9,5 @@ allowBuilds:
   prisma: false
   sharp: false
   unrs-resolver: false
+minimumReleaseAgeExclude:
+  - tsx@4.23.0

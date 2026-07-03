@@ -4,7 +4,11 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ConfirmDialogHost } from '@/components/ui/confirm-dialog';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'OpenVPN Admin Panel',

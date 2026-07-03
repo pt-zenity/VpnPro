@@ -1,8 +1,8 @@
 {
   "name": "ovpn-admin",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "private": true,
-  "packageManager": "pnpm@11.8.0",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev": "concurrently \"pnpm --filter @ovpn/panel dev\" \"pnpm --filter @ovpn/worker dev\"",
     "build": "pnpm -r build",
@@ -21,7 +21,7 @@
   "devDependencies": {
     "concurrently": "^10.0.3",
     "prisma": "^7.8.0",
-    "tsx": "^4.22.4",
+    "tsx": "^4.23.0",
     "typescript": "^6.0.3"
   },
   "engines": {

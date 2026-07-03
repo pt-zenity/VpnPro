@@ -18,7 +18,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+      'fixed inset-0 z-50 bg-black/70 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className
     )}
     {...props}
@@ -37,7 +37,18 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border border-border/60 bg-card p-6 shadow-2xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-xl max-h-[90vh] overflow-y-auto',
+        [
+          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 p-6',
+          'rounded-2xl max-h-[90vh] overflow-y-auto',
+          // Glassmorphism
+          'bg-[hsl(225_30%_9%/0.80)] backdrop-blur-2xl saturate-150',
+          'border border-white/[0.09]',
+          'shadow-[inset_0_1px_0_hsl(210_40%_98%/0.06),_0_8px_48px_hsl(0_0%_0%/0.55)]',
+          'duration-200',
+          'data-[state=open]:animate-in data-[state=closed]:animate-out',
+          'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+          'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+        ].join(' '),
         className
       )}
       {...props}
@@ -46,7 +57,7 @@ const DialogContent = React.forwardRef<
       {showClose && (
         <DialogPrimitive.Close
           aria-label="Close dialog"
-          className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none"
+          className="absolute right-4 top-4 rounded-lg p-1.5 text-muted-foreground/60 transition-all hover:text-foreground hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-ring disabled:pointer-events-none"
         >
           <X className="h-4 w-4" />
         </DialogPrimitive.Close>

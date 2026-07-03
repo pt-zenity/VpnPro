@@ -1,5 +1,4 @@
 import * as React from "react";
-
 import { cn } from "@/lib/utils";
 
 const Card = React.forwardRef<
@@ -9,7 +8,15 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-2xl border border-border/70 bg-card/70 text-card-foreground shadow-xl shadow-black/30 backdrop-blur-md",
+      // Glassmorphism card
+      "relative rounded-2xl overflow-hidden",
+      "bg-[hsl(225_28%_9%/0.60)]",
+      "backdrop-blur-xl saturate-150",
+      "border border-white/[0.06]",
+      "shadow-[inset_0_1px_0_hsl(210_40%_98%/0.04),_0_4px_24px_hsl(0_0%_0%/0.35)]",
+      "text-card-foreground",
+      // Subtle top-edge shine
+      "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-px before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent",
       className
     )}
     {...props}
@@ -73,4 +80,11 @@ const CardFooter = React.forwardRef<
 ));
 CardFooter.displayName = "CardFooter";
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent,
+};
