@@ -1,0 +1,305 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// Admin & Auth
+// ============================================================================
+
+model Admin {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         AdminRole @default(ADMIN)
+
+  createdAt   DateTime   @default(now())
+  lastLoginAt DateTime?
+
+  auditLogs      AuditLog[]
+  managedNodes   ManagerNode[] // nodes a MANAGER is assigned to (empty for full admins)
+  createdClients VpnClient[]   @relation("ClientCreator")
+
+  @@index([email])
+}
+
+enum AdminRole {
+  SUPERADMIN
+  ADMIN
+  MANAGER
+}
+
+// Assigns a MANAGER to a node (many-to-many). Full admins (SUPERADMIN/ADMIN)
+// implicitly have access to every node and do NOT get rows here.
+model ManagerNode {
+  id        String   @id @default(cuid())
+  adminId   String
+  nodeId    String
+  createdAt DateTime @default(now())
+
+  admin Admin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  node  Node  @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@unique([adminId, nodeId])
+  @@index([adminId])
+  @@index([nodeId])
+}
+
+model NodeAuthToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  nodeId    String?  @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  node Node? @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+}
+
+// ============================================================================
+// Nodes
+// ============================================================================
+
+model Node {
+  id             String       @id @default(cuid())
+  name           String
+  host           String
+  port           Int          @default(22)
+  apiToken       String       @unique
+  status         NodeStatus   @default(PENDING)
+  version        String?
+  openvpnVersion String?
+  xorMask        String?
+  domain         String?
+  useXor         Boolean      @default(true)
+  dnsServers     String[]     @default(["8.8.8.8", "1.1.1.1"])
+  mtu            Int          @default(1500)
+  mssfix         Int          @default(1360)
+
+  // OpenVPN server configuration (applied on install/reconfigure).
+  protocol       String       @default("udp")           // udp | tcp
+  ovpnPort       Int          @default(443)              // OpenVPN listen port (separate from SSH `port`)
+  obfuscation    String       @default("xormask")        // none | xormask | xorptrpos | reverse | obfuscate
+  cipher         String       @default("AES-256-GCM")     // data-channel cipher (AEAD)
+  authDigest     String       @default("SHA256")          // SHA256 | SHA512
+  tunnelMode     String       @default("full")            // full (redirect-gateway) | split
+  clientToClient Boolean      @default(false)
+  duplicateCn    Boolean      @default(false)
+
+  lastHeartbeatAt DateTime?
+  installedAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  metadata  Json?
+  pkiBackup Bytes?
+
+  authTokens   NodeAuthToken[]
+  clients      VpnClient[]
+  jobs         Job[]
+  healthChecks HealthCheck[]
+  auditLogs    AuditLog[]
+  managers     ManagerNode[]
+
+  @@index([status])
+  @@index([apiToken])
+}
+
+enum NodeStatus {
+  PENDING       // Added, waiting for agent connection
+  PROVISIONING  // Agent connected, install in progress
+  HEALTHY       // OpenVPN running, responding
+  UNHEALTHY     // Agent missing or OpenVPN down
+  ERROR         // Failed state, requires manual intervention
+}
+
+// ============================================================================
+// VPN Clients
+// ============================================================================
+
+model VpnClient {
+  id         String          @id @default(cuid())
+  nodeId     String
+  name       String
+  status     ClientStatus    @default(ACTIVE)
+  fingerprint String
+
+  createdAt  DateTime   @default(now())
+  revokedAt  DateTime?
+  disabledAt DateTime?
+  expiresAt  DateTime?
+  lastSeenAt DateTime?
+
+  // Cumulative traffic, reported by the node agent.
+  // bytesUp = client upload (server received), bytesDown = client download (server sent).
+  bytesUp   BigInt  @default(0)
+  bytesDown BigInt  @default(0)
+  online    Boolean @default(false)
+
+  // Live-session details for a currently-online client (cleared when offline).
+  connectedSince DateTime?   // start of the current session
+  realAddress    String?     // public IP the client connects from
+  vpnAddress     String?     // assigned VPN IP (10.8.0.x)
+
+  // Who created this client (admin or manager). Null = created before tracking
+  // or the creator account was deleted.
+  createdById String?
+
+  artifacts ClientArtifact[]
+  auditLogs AuditLog[]
+
+  node      Node   @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  createdBy Admin? @relation("ClientCreator", fields: [createdById], references: [id])
+
+  @@unique([nodeId, name])
+  @@index([nodeId, status])
+  @@index([fingerprint])
+  @@index([createdById])
+}
+
+enum ClientStatus {
+  ACTIVE
+  DISABLED   // temporarily blocked via CCD `disable` — reversible (cert still valid)
+  REVOKED
+  EXPIRED
+}
+
+model ClientArtifact {
+  id           String        @id @default(cuid())
+  clientId     String
+  nodeId       String
+  artifactType ArtifactType
+  storagePath  String?
+  contentHash  String
+  sizeBytes    Int
+
+  downloadUrl  String?
+  expiresAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  client VpnClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([contentHash])
+}
+
+enum ArtifactType {
+  OVPN
+  MOBILE_CONFIG
+}
+
+// ============================================================================
+// Jobs & Tasks
+// ============================================================================
+
+model Job {
+  id         String   @id @default(cuid())
+  type       JobType
+  status     JobStatus @default(PENDING)
+  priority   Int      @default(0)
+
+  nodeId     String
+  payload    Json
+  result     Json?
+  error      String?
+
+  // Who triggered this job (admin/manager). Null = system/agent or pre-tracking.
+  // Lets a manager see only the jobs they caused.
+  triggeredById String?
+
+  progress        Int?     @default(0)
+  progressMessage String?
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  attempts     Int      @default(0)
+  maxAttempts  Int      @default(3)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  node Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, status])
+  @@index([type, status])
+  @@index([triggeredById])
+  @@index([createdAt])
+}
+
+enum JobType {
+  NODE_INSTALL
+  CLIENT_CREATE
+  CLIENT_REVOKE
+  CLIENT_DISABLE
+  CLIENT_ENABLE
+  NODE_SYNC
+  HEALTH_CHECK
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ============================================================================
+// Monitoring
+// ============================================================================
+
+model HealthCheck {
+  id          String         @id @default(cuid())
+  nodeId      String
+  status      HealthStatus
+  details     Json
+  errorMessage String?
+
+  checkedAt DateTime @default(now())
+
+  node Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, checkedAt])
+}
+
+enum HealthStatus {
+  HEALTHY
+  DEGRADED
+  DOWN
+}
+
+// ============================================================================
+// Audit
+// ============================================================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  adminId   String?
+  nodeId    String?
+  clientId  String?
+
+  action    String
+  details   Json
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  admin   Admin?    @relation(fields: [adminId], references: [id])
+  node    Node?    @relation(fields: [nodeId], references: [id])
+  client  VpnClient? @relation(fields: [clientId], references: [id])
+
+  @@index([adminId])
+  @@index([nodeId])
+  @@index([clientId])
+  @@index([action, createdAt])
+}

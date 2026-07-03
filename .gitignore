@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.npm/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Docker
+*.tar.gz
+
+# Claude
+.claude/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Scratch / local clutter
+/open.md
+/scratch/
+/test.conf
+/ovpn-panel.tar.gz
+
+# Test artifacts (unanchored so they match under apps/panel/ too)
+test-screenshots*/
+test-results/
+playwright-report/

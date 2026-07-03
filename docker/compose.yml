@@ -1,0 +1,83 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ovpn-admin-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ovpn
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ovpn_admin
+    # Not published to the host by default — the panel/worker reach it over the
+    # internal compose network. Uncomment only if you need external DB access.
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ovpn"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ovpn-admin-redis
+    restart: unless-stopped
+    # Internal-only (not published to the host) — reached over the compose network.
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  panel:
+    build:
+      context: ..
+      dockerfile: docker/panel.Dockerfile
+      # Build over the host network so package downloads work even on hosts where
+      # the Docker bridge is filtered (some VPS providers do this).
+      network: host
+    container_name: ovpn-admin-panel
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://ovpn:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/ovpn_admin
+      REDIS_URL: redis://redis:6379
+      # Secrets MUST come from .env (compose auto-loads ./.env). No weak defaults
+      # are baked in — the panel refuses to start in production without strong ones.
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -base64 48)}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set ENCRYPTION_KEY in .env}
+      API_TOKEN_SALT: ${API_TOKEN_SALT:?set API_TOKEN_SALT in .env}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      PANEL_URL: ${PANEL_URL:-http://localhost:3000}
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/worker.Dockerfile
+      network: host
+    container_name: ovpn-admin-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://ovpn:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/ovpn_admin
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:

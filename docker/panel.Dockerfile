@@ -1,0 +1,51 @@
+FROM node:22-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+RUN corepack enable pnpm && pnpm i --frozen-lockfile
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+ENV NEXT_TELEMETRY_DISABLED 1
+
+RUN corepack enable pnpm
+# Prisma 7 client must be generated before the type-checked Next build, otherwise
+# @prisma/client has no PrismaClient export and the build fails.
+RUN pnpm prisma generate
+RUN pnpm --filter @ovpn/panel build
+
+# Production image, copy all the files and run next
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/apps/panel/public ./apps/panel/public
+
+# Set the correct permission for prerender cache
+RUN mkdir -p .next
+RUN chown -R nextjs:nodejs /app
+
+COPY --from=builder --chown=nextjs:nodejs /app/apps/panel/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/panel/.next/static ./apps/panel/.next/static
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
+
+# Monorepo standalone output places the entrypoint under apps/panel/.
+CMD ["node", "apps/panel/server.js"]

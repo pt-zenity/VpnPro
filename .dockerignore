@@ -1,0 +1,11 @@
+node_modules/
+apps/panel/node_modules/
+apps/worker/node_modules/
+apps/panel/.next/
+apps/worker/dist/
+.git/
+.gemini/
+postgres_data/
+redis_data/
+.env
+.DS_Store
