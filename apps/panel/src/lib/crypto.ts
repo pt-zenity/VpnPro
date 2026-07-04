@@ -139,6 +139,11 @@ export function createRegistrationToken(): string {
 }
 
 export async function verifyRegistrationToken(token: string) {
+  // Guard: only accept tokens that look like UUIDs (36 chars, canonical format).
+  // This prevents oversized/malformed tokens from reaching the DB query.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(token)) return null;
+
   return await prisma.nodeAuthToken.findUnique({
     where: { token },
   });
@@ -155,6 +160,9 @@ export function generateFingerprint(): string {
 // ============================================================================
 // Encryption (AES-GCM)
 // ============================================================================
+
+// AES-GCM uses a 96-bit (12-byte) IV → 24 hex characters.
+const IV_HEX_LENGTH = 24;
 
 export async function encrypt(text: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -183,10 +191,23 @@ export async function encrypt(text: string): Promise<string> {
 
 export async function decrypt(encryptedText: string): Promise<string | null> {
   try {
-    const [ivHex, encryptedHex] = encryptedText.split(':');
+    const colonIdx = encryptedText.indexOf(':');
+    if (colonIdx < 0) return null;
 
-    const iv = new Uint8Array(ivHex.match(/.{2}/g)?.map(b => parseInt(b, 16)) ?? []);
-    const encrypted = new Uint8Array(encryptedHex.match(/.{2}/g)?.map(b => parseInt(b, 16)) ?? []);
+    const ivHex = encryptedText.slice(0, colonIdx);
+    const encryptedHex = encryptedText.slice(colonIdx + 1);
+
+    // Guard: IV must be exactly 24 hex chars (= 12 bytes for AES-GCM).
+    // An undersized IV would produce a bogus Uint8Array and a misleading
+    // crypto error; reject early with a clear null return instead.
+    if (ivHex.length !== IV_HEX_LENGTH) return null;
+
+    // Guard: both halves must contain only hex digits to prevent prototype
+    // pollution or unexpected parseInt() behaviour.
+    if (!/^[0-9a-fA-F]+$/.test(ivHex) || !/^[0-9a-fA-F]+$/.test(encryptedHex)) return null;
+
+    const iv = new Uint8Array(ivHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
+    const encrypted = new Uint8Array(encryptedHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
 
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(

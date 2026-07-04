@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createManagerSchema } from '@ovpn/api';
 import { withFullAdmin } from '@/lib/middleware';
+import { getClientIp } from '@/lib/auth';
 import { hashPassword } from '@/lib/crypto';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 
@@ -73,8 +74,8 @@ export const POST = withFullAdmin(async (request: NextRequest, payload) => {
         action: 'manager.created',
         adminId: payload.sub,
         details: { managerId: manager.id, email, nodeIds: validNodeIds },
-        ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
-        userAgent: request.headers.get('user-agent') ?? undefined,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get('user-agent')?.slice(0, 256) ?? undefined,
       },
     });
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { updateManagerSchema } from '@ovpn/api';
 import { withFullAdmin } from '@/lib/middleware';
+import { getClientIp } from '@/lib/auth';
 import { hashPassword } from '@/lib/crypto';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 
@@ -44,8 +45,8 @@ export const PATCH = withFullAdmin(async (request: NextRequest, payload, { param
         action: 'manager.updated',
         adminId: payload.sub,
         details: { managerId: id, nodeIds: input.nodeIds, passwordChanged: !!input.password },
-        ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
-        userAgent: request.headers.get('user-agent') ?? undefined,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get('user-agent')?.slice(0, 256) ?? undefined,
       },
     });
 
@@ -76,8 +77,8 @@ export const DELETE = withFullAdmin(async (request: NextRequest, payload, { para
         action: 'manager.deleted',
         adminId: payload.sub,
         details: { managerId: id, email: target.email },
-        ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
-        userAgent: request.headers.get('user-agent') ?? undefined,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get('user-agent')?.slice(0, 256) ?? undefined,
       },
     });
 

@@ -7,6 +7,7 @@ import { withAuth, withFullAdmin } from '@/lib/middleware';
 import { accessibleNodeIds } from '@/lib/access';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 import type { AuthPayload } from '@/lib/auth';
+import { getClientIp } from '@/lib/auth';
 import type { NodeStatus } from '@ovpn/types';
 import type { Prisma } from '@prisma/client';
 
@@ -127,8 +128,8 @@ async function POST_handler(request: NextRequest) {
         action: 'node.created',
         nodeId: node.id,
         details: { input } as Prisma.InputJsonValue,
-        ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
-        userAgent: request.headers.get('user-agent') ?? undefined,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get('user-agent')?.slice(0, 256) ?? undefined,
       },
     });
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { withAuth } from '@/lib/middleware';
+import { getClientIp } from '@/lib/auth';
 import { checkClientAccess } from '@/lib/access';
 import { decrypt } from '@/lib/crypto';
 
@@ -74,8 +75,8 @@ export const GET = withAuth(async (request: NextRequest, payload, { params }: { 
         nodeId: client.nodeId,
         clientId: client.id,
         details: { clientName: client.name },
-        ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
-        userAgent: request.headers.get('user-agent') ?? undefined,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get('user-agent')?.slice(0, 256) ?? undefined,
       },
     });
 
