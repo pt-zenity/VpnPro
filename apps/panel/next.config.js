@@ -157,12 +157,6 @@ const nextConfig = {
   transpilePackages: ['@ovpn/db', '@ovpn/api', '@ovpn/types'],
   serverExternalPackages: ['@prisma/client', 'prisma'],
 
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '2mb',
-    },
-  },
-
   async headers() {
     return [
       // Global: every response

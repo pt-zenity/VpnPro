@@ -82,7 +82,7 @@ async function GET_handler(request: NextRequest, payload: AuthPayload) {
 export const GET = withAuth(GET_handler);
 
 // POST /api/nodes - Create new node
-async function POST_handler(request: NextRequest) {
+async function POST_handler(request: NextRequest, payload: AuthPayload) {
   try {
     const body = await request.json();
     const input = createNodeSchema.parse(body);

@@ -104,6 +104,18 @@ export const PATCH = withFullAdmin(async (request: NextRequest, payload, { param
         ...input,
         metadata: input.metadata as Prisma.InputJsonValue,
       },
+      // Never return sensitive fields (apiToken, pkiBackup) to the client.
+      select: {
+        id: true,
+        name: true,
+        host: true,
+        port: true,
+        status: true,
+        version: true,
+        openvpnVersion: true,
+        metadata: true,
+        updatedAt: true,
+      },
     });
 
     // Audit log

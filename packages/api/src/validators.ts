@@ -27,7 +27,7 @@ const hostSchema = z
       const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
       return ipRegex.test(v) || domainRegex.test(v);
     },
-    'Invalid host (IP or domain expected',
+    'Invalid host (IP or domain expected)',
   );
 
 const nodeIdSchema = z.string().cuid();
