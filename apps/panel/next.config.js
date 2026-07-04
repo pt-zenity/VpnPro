@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 
+// Read version from the nearest package.json at build time so
+// NEXT_PUBLIC_APP_VERSION is baked into the client bundle automatically.
+const { version } = require('./package.json');
+
 // ============================================================================
 // Security headers — applied to every response via Next.js headers() API.
 //
@@ -173,6 +177,12 @@ const nextConfig = {
   output: 'standalone',
   transpilePackages: ['@ovpn/db', '@ovpn/api', '@ovpn/types'],
   serverExternalPackages: ['@prisma/client', 'prisma'],
+
+  // Expose version to client components via process.env.NEXT_PUBLIC_APP_VERSION
+  env: {
+    NEXT_PUBLIC_APP_VERSION: version,
+    NEXT_PUBLIC_BUILD_TIME:  new Date().toISOString(),
+  },
 
   async headers() {
     return [
