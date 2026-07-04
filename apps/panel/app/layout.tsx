@@ -13,6 +13,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'OpenVPN Admin Panel',
   description: 'Self-hosted admin panel for OpenVPN XOR nodes',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({

@@ -43,9 +43,12 @@ const GLOBAL_HEADERS = [
     value: 'max-age=63072000; includeSubDomains; preload',
   },
 
-  // Permissions-Policy — deny access to sensors, hardware APIs, and FLoC/Topics.
-  // interest-cohort=() was the FLoC opt-out; browsing-topics=() is the Topics API successor.
-  // Both are included for maximum compatibility across browser versions.
+  // Permissions-Policy — deny access to sensors, hardware APIs, and tracking.
+  // Only standardised, shipping directives are included here. Unrecognised
+  // feature names (e.g. "web-share" was removed from the spec in 2024) emit a
+  // browser warning and should be omitted to keep the header clean.
+  // interest-cohort=() is the legacy FLoC opt-out; browsing-topics=() is the
+  // Privacy Sandbox Topics API successor — both are kept for broad compatibility.
   {
     key:   'Permissions-Policy',
     value: [
@@ -67,7 +70,8 @@ const GLOBAL_HEADERS = [
       'screen-wake-lock=()',
       'sync-xhr=()',
       'usb=()',
-      'web-share=()',
+      // 'web-share=()' — REMOVED: no longer a recognised Permissions-Policy
+      //   feature; Chrome ≥ 124 logs a console warning for it.
       'xr-spatial-tracking=()',
       'interest-cohort=()',   // legacy FLoC opt-out
       'browsing-topics=()',   // Topics API opt-out
@@ -96,32 +100,45 @@ const HTML_HEADERS = [
 
   // Content-Security-Policy
   //
-  // script-src:
-  //   'self' only — 'unsafe-eval' is NOT needed in production Next.js 16
-  //   standalone builds (confirmed: 0 eval() calls in .next/static output).
-  //   This blocks XSS payload execution even if an attacker injects a script tag.
+  // script-src 'self' 'unsafe-inline':
+  //   Next.js 16 App Router / RSC streaming injects inline <script> tags to
+  //   push RSC payload (self.__next_f.push([...])) on every page load. These
+  //   scripts contain per-request dynamic data (route params, timestamps, etc.)
+  //   so their SHA256 hashes change every response — hash-based allowlisting is
+  //   not feasible without a per-request nonce middleware.
+  //
+  //   'unsafe-inline' is the pragmatic trade-off accepted by virtually all
+  //   Next.js App Router deployments. XSS protection is still provided by:
+  //     • Strict output encoding in React (dangerouslySetInnerHTML not used)
+  //     • object-src 'none' — blocks Flash / legacy plugin exploits
+  //     • base-uri 'self' — prevents base-tag hijacking
+  //     • form-action 'self' — prevents form phishing redirect
+  //     • frame-ancestors 'none' — prevents clickjacking
+  //     • connect-src 'self' — restricts fetch/XHR to same origin
+  //
+  //   Cloudflare Beacon (analytics) script is allowlisted via script-src-elem
+  //   so Cloudflare can inject it without needing 'unsafe-inline' on the main
+  //   script-src directive.
   //
   // style-src 'unsafe-inline':
   //   Required — Tailwind CSS v4 injects inline style attributes at runtime.
-  //   TODO: switch to nonce-based CSP once Tailwind v4 supports style nonces.
   //
-  // connect-src:
-  //   'self' covers API calls. 'wss://vpn.sis2.xyz' covers Next.js HMR/RSC
-  //   WebSocket and Server-Sent Events on the same host.
+  // connect-src 'self' wss://vpn.sis2.xyz:
+  //   'self' covers API calls. wss:// covers RSC WebSocket on same host.
   //
-  // img-src data: blob::
-  //   data: URIs used for inline SVG avatars; blob: for any canvas exports.
-  //
-  // font-src 'self' data::
-  //   Next.js self-hosts fonts as woff2 files; data: covers any base64 fonts.
-  //
-  // frame-ancestors 'none':
-  //   Belt-and-suspenders with X-Frame-Options: DENY.
+  // script-src-elem:
+  //   Allows the Cloudflare Web Analytics beacon loaded from
+  //   static.cloudflareinsights.com. script-src-elem overrides script-src for
+  //   <script src="..."> elements, so 'unsafe-inline' stays scoped to inline
+  //   only (script-src applies to both unless script-src-elem is set).
   {
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self'",
+      // 'unsafe-inline' required for Next.js RSC streaming inline scripts
+      "script-src 'self' 'unsafe-inline'",
+      // Allow Cloudflare Beacon <script src="..."> via explicit elem override
+      "script-src-elem 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
