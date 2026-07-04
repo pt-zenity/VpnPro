@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest, SESSION_COOKIE, sessionCookieOptions } from '@/lib/auth';
+import { authenticateRequest, SESSION_COOKIE, sessionCookieOptions, getClientIp } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 
@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
         action: 'admin.logout',
         adminId: payload.sub,
         details: {},
-        ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
-        userAgent: request.headers.get('user-agent') ?? undefined,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get('user-agent')?.slice(0, 256) ?? undefined,
       },
     });
 

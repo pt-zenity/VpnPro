@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { installNodeSchema } from '@ovpn/api';
 import { withFullAdmin } from '@/lib/middleware';
+import { getClientIp } from '@/lib/auth';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 
 type Params = Promise<{ id: string }>;
@@ -120,8 +121,8 @@ export const POST = withFullAdmin(async (request: NextRequest, payload, { params
         action: isReconfigure ? 'node.reconfigured' : 'node.install_triggered',
         nodeId: node.id,
         details: { jobId: job.id, obfuscation, cipher: input.cipher, auth: input.auth, protocol: input.protocol, port: input.port },
-        ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
-        userAgent: request.headers.get('user-agent') ?? undefined,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get('user-agent')?.slice(0, 256) ?? undefined,
       },
     });
 

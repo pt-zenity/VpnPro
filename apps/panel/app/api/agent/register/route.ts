@@ -3,15 +3,49 @@ import { prisma } from '@/lib/prisma';
 import { agentRegisterSchema } from '@ovpn/api';
 import { verifyRegistrationToken, hashApiToken } from '@/lib/crypto';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
+import { rateLimit } from '@/lib/rate-limit';
+import { getClientIp } from '@/lib/auth';
 import type { Prisma } from '@prisma/client';
 
 // POST /api/agent/register - Agent registration (one-time)
+//
+// Security hardening:
+//  1. Rate-limit by IP to prevent token-bruteforce / registration-flood attacks.
+//     20 attempts per 10 minutes per IP is generous for legitimate automated
+//     installers while still blocking scanners.
+//  2. Fail BEFORE any DB lookup when the rate limit is exceeded to avoid oracle
+//     leakage (an attacker should learn nothing from a 429 except "slow down").
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const input = agentRegisterSchema.parse(body);
+    // -- Rate limit (IP-based, pre-auth) ----------------------------------------
+    const ip = getClientIp(request);
+    const { allowed, retryAfterSec } = await rateLimit(
+      `agent:register:${ip}`,
+      { limit: 20, windowSec: 600 },
+    );
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'TOO_MANY_ATTEMPTS', message: 'Too many registration attempts. Try again later.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfterSec) } },
+      );
+    }
 
-    // Verify registration token
+    // -- Body parse & validate --------------------------------------------------
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'INVALID_INPUT', message: 'Request body must be valid JSON' },
+        { status: 400 },
+      );
+    }
+
+    const parsed = agentRegisterSchema.safeParse(body);
+    if (!parsed.success) return zodErrorResponse(parsed.error);
+    const input = parsed.data;
+
+    // -- Token validation -------------------------------------------------------
     const tokenRecord = await verifyRegistrationToken(input.token);
     if (!tokenRecord) {
       return NextResponse.json(
@@ -34,7 +68,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get node
+    // -- Node lookup ------------------------------------------------------------
     if (!tokenRecord.nodeId) {
       return NextResponse.json(
         { error: 'INVALID_TOKEN', message: 'Invalid token' },
@@ -53,16 +87,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Allow re-registration for existing nodes (Migration)
-    // We just update the API token.
-
-    // Mark token as used
+    // -- Mark token as used & issue API token -----------------------------------
     await prisma.nodeAuthToken.update({
       where: { id: tokenRecord.id },
       data: { usedAt: new Date() },
     });
 
-    // Update node status and generate new API token for agent authentication
     const rawApiToken = crypto.randomUUID();
     const hashedApiToken = await hashApiToken(rawApiToken);
 
@@ -85,6 +115,7 @@ export async function POST(request: NextRequest) {
         details: {
           agentVersion: input.agentVersion,
           systemInfo: input.systemInfo,
+          ip,
         },
       },
     });

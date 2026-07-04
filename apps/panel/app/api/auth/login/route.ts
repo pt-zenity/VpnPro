@@ -4,33 +4,53 @@ import { loginSchema } from '@ovpn/api';
 import { verifyPassword, createToken } from '@/lib/crypto';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 import { rateLimit } from '@/lib/rate-limit';
-import { SESSION_COOKIE, sessionCookieOptions } from '@/lib/auth';
+import { SESSION_COOKIE, sessionCookieOptions, getClientIp } from '@/lib/auth';
 
 // POST /api/auth/login
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { email, password } = loginSchema.parse(body);
+    // Validate and parse body *before* touching the DB.
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'INVALID_INPUT', message: 'Request body must be valid JSON' },
+        { status: 400 },
+      );
+    }
 
-    // Rate limit by client IP + email to throttle credential-stuffing/brute force.
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-    const { allowed, retryAfterSec } = await rateLimit(
-      `login:${ip}:${email.toLowerCase()}`,
-      { limit: 10, windowSec: 900 },
-    );
-    if (!allowed) {
+    const parsed = loginSchema.safeParse(body);
+    if (!parsed.success) return zodErrorResponse(parsed.error);
+    const { email, password } = parsed.data;
+
+    // Sanitised client IP (no header-injection possible after getClientIp).
+    const ip = getClientIp(request);
+
+    // Primary rate-limit key: per-IP (broad brute-force protection).
+    // Secondary key: per email (credential-stuffing protection).
+    // Both must pass; the more restrictive one governs.
+    const [ipLimit, emailLimit] = await Promise.all([
+      rateLimit(`login:ip:${ip}`,                    { limit: 20, windowSec: 900 }),
+      rateLimit(`login:email:${email.toLowerCase()}`, { limit: 10, windowSec: 900 }),
+    ]);
+
+    const blocked = !ipLimit.allowed || !emailLimit.allowed;
+    const retryAfter = Math.max(ipLimit.retryAfterSec, emailLimit.retryAfterSec);
+
+    if (blocked) {
       return NextResponse.json(
         { error: 'TOO_MANY_ATTEMPTS', message: 'Too many login attempts. Try again later.' },
-        { status: 429, headers: { 'Retry-After': String(retryAfterSec) } },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
       );
     }
 
     const admin = await prisma.admin.findUnique({
-      where: { email },
+      where: { email: email.toLowerCase() },
     });
 
     if (!admin) {
-      await logFailedLogin(request, null);
+      await logFailedLogin(request, ip, null);
       return NextResponse.json(
         { error: 'INVALID_CREDENTIALS', message: 'Invalid email or password' },
         { status: 401 },
@@ -39,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     const isValid = await verifyPassword(admin.passwordHash, password);
     if (!isValid) {
-      await logFailedLogin(request, admin.id);
+      await logFailedLogin(request, ip, admin.id);
       return NextResponse.json(
         { error: 'INVALID_CREDENTIALS', message: 'Invalid email or password' },
         { status: 401 },
@@ -63,14 +83,14 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies();
     cookieStore.set(SESSION_COOKIE, token, sessionCookieOptions(request));
 
-    // Audit log
+    // Audit log — use sanitised IP only.
     await prisma.auditLog.create({
       data: {
         action: 'admin.login',
         adminId: admin.id,
         details: { success: true },
-        ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
-        userAgent: request.headers.get('user-agent') ?? undefined,
+        ipAddress: ip,
+        userAgent: request.headers.get('user-agent')?.slice(0, 256) ?? undefined,
       },
     });
 
@@ -97,15 +117,19 @@ export async function POST(request: NextRequest) {
  * Record a failed login attempt. Best-effort only — never let an audit-log
  * failure surface as a 500 to the caller.
  */
-async function logFailedLogin(request: NextRequest, adminId: string | null): Promise<void> {
+async function logFailedLogin(
+  request: NextRequest,
+  ip: string,
+  adminId: string | null,
+): Promise<void> {
   try {
     await prisma.auditLog.create({
       data: {
         action: 'admin.login_failed',
         ...(adminId ? { adminId } : {}),
         details: { success: false },
-        ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
-        userAgent: request.headers.get('user-agent') ?? undefined,
+        ipAddress: ip,
+        userAgent: request.headers.get('user-agent')?.slice(0, 256) ?? undefined,
       },
     });
   } catch (error) {

@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { createClientSchema } from '@ovpn/api';
 import { generateFingerprint } from '@/lib/crypto';
 import { withAuth } from '@/lib/middleware';
+import { getClientIp } from '@/lib/auth';
 import { canAccessNode, clientOwnershipWhere } from '@/lib/access';
 import { isZodError, zodErrorResponse } from '@/lib/api-helpers';
 import type { ClientStatus } from '@ovpn/types';
@@ -162,8 +163,8 @@ export const POST = withAuth(async (request: NextRequest, payload, { params }: {
         nodeId,
         clientId: client.id,
         details: { clientName: input.name },
-        ipAddress: request.headers.get('x-forwarded-for') ?? undefined,
-        userAgent: request.headers.get('user-agent') ?? undefined,
+        ipAddress: getClientIp(request),
+        userAgent: request.headers.get('user-agent')?.slice(0, 256) ?? undefined,
       },
     });
 
