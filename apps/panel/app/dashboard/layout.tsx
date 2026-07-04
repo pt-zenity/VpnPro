@@ -3,6 +3,7 @@ import { SessionProvider, type Role } from "@/components/session-context";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { verifyToken } from "@/lib/crypto";
+import { APP_VERSION_LABEL } from "@/lib/version";
 
 export default async function DashboardLayout({
   children,
@@ -56,10 +57,20 @@ export default async function DashboardLayout({
                 </div>
               </div>
 
-              {/* Right — decorative glow dots */}
-              <div className="flex items-center gap-2 opacity-40">
-                <div className="h-1.5 w-1.5 rounded-full bg-[hsl(192_100%_58%)] pulse-glow" />
-                <div className="h-1.5 w-1.5 rounded-full bg-[hsl(265_80%_68%)]" style={{ animationDelay: '0.5s' }} />
+              {/* Right — version label + decorative glow dots */}
+              <div className="flex items-center gap-3">
+                {/* Version badge */}
+                <span
+                  className="hidden sm:inline-flex items-center rounded-full border border-white/[0.08] bg-white/[0.03] px-2.5 py-0.5 font-mono text-[10px] text-muted-foreground/50 tracking-widest select-none"
+                  title={`OVPN Admin Panel ${APP_VERSION_LABEL}`}
+                >
+                  {APP_VERSION_LABEL}
+                </span>
+                {/* Glow dots */}
+                <div className="flex items-center gap-2 opacity-40">
+                  <div className="h-1.5 w-1.5 rounded-full bg-[hsl(192_100%_58%)] pulse-glow" />
+                  <div className="h-1.5 w-1.5 rounded-full bg-[hsl(265_80%_68%)]" style={{ animationDelay: '0.5s' }} />
+                </div>
               </div>
             </div>
           </header>
