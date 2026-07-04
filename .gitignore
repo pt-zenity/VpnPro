@@ -28,6 +28,12 @@ out/
 # Claude
 .claude/
 
+# SSH deploy keys — never commit private keys
+scripts/.deploy_key
+*.pem
+id_ed25519
+id_rsa
+
 # TypeScript build info
 *.tsbuildinfo
 
