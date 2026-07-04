@@ -13,11 +13,13 @@ import {
   LogOut,
   Menu,
   Shield,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Logo } from "@/components/ui/logo";
+import { APP_VERSION_LABEL } from "@/lib/version";
 
 type Role = "SUPERADMIN" | "ADMIN" | "MANAGER";
 
@@ -25,6 +27,7 @@ const baseNav = [
   { name: "Dashboard",  href: "/dashboard",           icon: LayoutDashboard },
   { name: "Nodes",      href: "/dashboard/nodes",      icon: Server },
   { name: "Clients",    href: "/dashboard/clients",    icon: Users },
+  { name: "Traffic",    href: "/dashboard/traffic",    icon: Activity },
   { name: "Jobs",       href: "/dashboard/jobs",       icon: Briefcase },
   { name: "Audit Logs", href: "/dashboard/audit",      icon: FileText },
 ];
@@ -145,6 +148,13 @@ function SidebarInner({
           <LogOut className="h-4 w-4" aria-hidden="true" />
           Sign out
         </Link>
+
+        {/* Version badge */}
+        <div className="flex items-center justify-center pt-1 pb-0.5">
+          <span className="font-mono text-[10px] text-muted-foreground/40 tracking-widest select-none">
+            OVPN Admin {APP_VERSION_LABEL}
+          </span>
+        </div>
       </div>
     </div>
   );
