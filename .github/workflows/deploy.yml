@@ -1,0 +1,136 @@
+name: CI / Deploy to VPS
+
+# ============================================================================
+# Triggers
+# ============================================================================
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:        # allow manual trigger from GitHub UI
+
+# Cancel in-progress runs on the same branch to avoid stacked deploys
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ============================================================================
+# Environment variables shared across all jobs
+# ============================================================================
+env:
+  NODE_VERSION: '24'
+  PNPM_VERSION: '11'
+
+jobs:
+  # --------------------------------------------------------------------------
+  # JOB 1: CI — lint, type-check, unit tests
+  # Runs on both push to main AND pull_requests so PRs are gated.
+  # --------------------------------------------------------------------------
+  ci:
+    name: CI (lint + typecheck + test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @ovpn/db exec prisma generate
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+
+      - name: TypeScript check (panel)
+        run: pnpm --filter @ovpn/panel exec tsc --noEmit
+
+      - name: TypeScript check (worker)
+        run: pnpm --filter @ovpn/worker exec tsc --noEmit
+
+      - name: Run unit tests
+        run: pnpm --filter @ovpn/panel test --run
+        env:
+          # Provide non-empty secrets so requireSecret() doesn't throw
+          JWT_SECRET: ci_test_jwt_secret_32_chars_minimum_ok
+          ENCRYPTION_KEY: ci_test_enc_key_32_chars_minimum_ok
+          API_TOKEN_SALT: ci_test_api_salt_16c
+
+  # --------------------------------------------------------------------------
+  # JOB 2: Deploy — SSH into VPS, pull, build, migrate, reload PM2
+  # Only runs on push to main (not PRs) and only if CI passes.
+  # --------------------------------------------------------------------------
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    needs: ci
+    timeout-minutes: 20
+    # Only deploy on push to main, not on pull_request events
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Setup SSH ──────────────────────────────────────────────────────────
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT || '22' }} -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH configured"
+
+      # ── Execute deploy script on VPS ──────────────────────────────────────
+      - name: Deploy to VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ secrets.VPS_PORT || '22' }} \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              "bash /home/vpn/webapp/scripts/deploy.sh"
+
+      # ── Health check ──────────────────────────────────────────────────────
+      - name: Health check — wait for panel to respond
+        run: |
+          echo "Waiting for panel to come back online..."
+          for i in $(seq 1 18); do
+            STATUS=$(curl -sk -o /dev/null -w "%{http_code}" https://vpn.sis2.xyz/login || echo "000")
+            echo "  Attempt $i/18: HTTP $STATUS"
+            if [ "$STATUS" = "200" ] || [ "$STATUS" = "307" ] || [ "$STATUS" = "302" ]; then
+              echo "✅ Panel is online (HTTP $STATUS)"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "❌ Panel did not come back online within 3 minutes"
+          exit 1
+
+      - name: Notify success
+        if: success()
+        run: |
+          echo "🚀 Deployment successful!"
+          echo "   Commit: ${{ github.sha }}"
+          echo "   Branch: ${{ github.ref_name }}"
+          echo "   URL: https://vpn.sis2.xyz"
+
+      - name: Rollback hint on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed."
+          echo "   To rollback manually, SSH into the VPS and run:"
+          echo "     cd /home/vpn/webapp && git revert HEAD && bash scripts/deploy.sh"
