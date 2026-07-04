@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Server, Users, Briefcase, ArrowRight, Activity, TrendingUp, Shield, AlertTriangle } from 'lucide-react';
+import { Plus, Server, Users, Briefcase, ArrowRight, Activity, TrendingUp, Shield, AlertTriangle, Wifi, ArrowUpFromLine, ArrowDownToLine } from 'lucide-react';
 import Link from 'next/link';
 
 import { apiFetch, UnauthorizedError } from '@/components/use-api';
@@ -20,12 +20,29 @@ interface Stats {
   jobs: { running: number; failed: number; pending: number };
 }
 
+interface TrafficSummary {
+  onlineClients: number;
+  totalBytesUp: string;
+  totalBytesDown: string;
+  healthyNodes: number;
+  totalNodes: number;
+}
+
+function fmtBytes(raw: string | number): string {
+  const n = typeof raw === 'string' ? parseInt(raw, 10) : raw;
+  if (Number.isNaN(n) || n === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(n) / Math.log(1024));
+  return `${(n / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { isFullAdmin } = useSession();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [traffic, setTraffic] = useState<TrafficSummary | null>(null);
 
   const fetchStats = useCallback(async () => {
     setError(false);
@@ -48,9 +65,25 @@ export default function DashboardPage() {
     }
   }, [router]);
 
+  const fetchTraffic = useCallback(async () => {
+    try {
+      const res = await apiFetch<{ totals: TrafficSummary }>('/api/traffic');
+      setTraffic(res.totals);
+    } catch {
+      // non-critical — don't surface traffic errors on the main dashboard
+    }
+  }, []);
+
   useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+    fetchTraffic();
+  }, [fetchStats, fetchTraffic]);
+
+  // Refresh traffic every 10s silently
+  useEffect(() => {
+    const t = setInterval(fetchTraffic, 10000);
+    return () => clearInterval(t);
+  }, [fetchTraffic]);
 
   if (loading) {
     return <LoadingState label="Loading dashboard" />;
@@ -212,6 +245,82 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Live Traffic Widget */}
+      <Card className="bg-card border-primary/10">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Activity className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-medium">Live Traffic</CardTitle>
+                <CardDescription className="text-xs">Real-time connection monitor</CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {traffic && (
+                <Badge variant="success" className="gap-1.5 text-xs">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                  {traffic.onlineClients} online
+                </Badge>
+              )}
+              <Button asChild variant="ghost" size="sm" className="gap-1 text-xs">
+                <Link href="/dashboard/traffic">
+                  View details
+                  <ArrowRight className="h-3 w-3" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!traffic ? (
+            <div className="text-sm text-muted-foreground">Loading traffic…</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Wifi className="h-3.5 w-3.5 text-emerald-400" />
+                  Connected
+                </div>
+                <div className="text-2xl font-bold text-emerald-400">{traffic.onlineClients}</div>
+                <div className="text-xs text-muted-foreground">active sessions</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <ArrowUpFromLine className="h-3.5 w-3.5 text-emerald-400" />
+                  Total Upload
+                </div>
+                <div className="text-2xl font-bold font-mono text-emerald-400">{fmtBytes(traffic.totalBytesUp)}</div>
+                <div className="text-xs text-muted-foreground">all time</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <ArrowDownToLine className="h-3.5 w-3.5 text-blue-400" />
+                  Total Download
+                </div>
+                <div className="text-2xl font-bold font-mono text-blue-400">{fmtBytes(traffic.totalBytesDown)}</div>
+                <div className="text-xs text-muted-foreground">all time</div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Server className="h-3.5 w-3.5 text-cyan-400" />
+                  Healthy Nodes
+                </div>
+                <div className="text-2xl font-bold text-cyan-400">
+                  {traffic.healthyNodes}
+                  <span className="text-sm font-normal text-muted-foreground ml-1">/ {traffic.totalNodes}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {traffic.healthyNodes === traffic.totalNodes ? 'All operational' : 'Some need attention'}
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <Card className="bg-card">
